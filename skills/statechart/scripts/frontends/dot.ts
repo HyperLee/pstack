@@ -35,7 +35,10 @@ export const parseState = (label: string, parsed = new Map<string, [string, Valu
 
 export type Lines = string | Iterable<string>;
 
-export const linesOf = (input: Lines) => (typeof input === "string" ? input.split("\n") : input);
+export function* linesOf(input: Lines): Generator<string> {
+  for (const line of typeof input === "string" ? input.split("\n") : input)
+    yield line.endsWith("\r") ? line.slice(0, -1) : line;
+}
 
 export function parseDot(input: Lines): Graph {
   const states = new Map<string, State>();

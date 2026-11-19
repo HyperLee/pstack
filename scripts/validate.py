@@ -26,7 +26,7 @@ def validate(root=ROOT):
     for p in skills + operational:
         label = str(p.relative_to(root))
         try:
-            parts = p.read_text().split("---", 2)
+            parts = p.read_text(encoding="utf-8-sig").split("---", 2)
             assert len(parts) == 3 and not parts[0].strip(), "missing frontmatter"
             fm = yaml.safe_load(parts[1])
             assert isinstance(fm, dict), "frontmatter must be a map"
@@ -35,7 +35,7 @@ def validate(root=ROOT):
             assert re.fullmatch(r"[a-z0-9-]{1,64}", fm["name"]), "invalid name"
             assert isinstance(fm.get("description"), str) and 0 < len(fm["description"]) <= 1024, "invalid description"
             if p in skills:
-                ui = yaml.safe_load((p.parent / "agents/openai.yaml").read_text())
+                ui = yaml.safe_load((p.parent / "agents/openai.yaml").read_text(encoding="utf-8-sig"))
                 interface = ui["interface"]
                 assert interface.get("display_name"), "missing display_name"
                 assert 25 <= len(interface["short_description"]) <= 64, "short_description must be 25–64 characters"
@@ -50,7 +50,7 @@ def validate(root=ROOT):
     banned = ("~/.cursor/", ".cursor/skills/", ".cursor/settings.json", "api2.cursor.sh",
               "subagent_type:", "run_in_background:", "SendToUser", "update_state")
     for p in files:
-        text = p.read_text()
+        text = p.read_text(encoding="utf-8-sig")
         for token in banned:
             if token in text:
                 errors.append(str(p.relative_to(root)) + ": retired dependency " + token)
@@ -65,7 +65,7 @@ def validate(root=ROOT):
                 errors.append(str(p.relative_to(root)) + ": missing link " + ref)
             elif anchor and target.is_file() and target.suffix == ".md":
                 headings = set()
-                for title in re.findall(r"^#{1,6}\s+(.+)$", target.read_text(), re.M):
+                for title in re.findall(r"^#{1,6}\s+(.+)$", target.read_text(encoding="utf-8-sig"), re.M):
                     headings.add(re.sub(r"[^\w\-\s]", "", title.lower()).replace(" ", "-"))
                 if anchor not in headings:
                     errors.append(str(p.relative_to(root)) + ": missing heading " + ref)

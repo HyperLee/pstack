@@ -33,7 +33,8 @@ for (const name of fs.readdirSync(corpus)) {
         encoding: "utf8",
         env: {
           ...process.env,
-          JAVA: path.join(here, "java.ts"),
+          JAVA: process.execPath,
+          STATECHART_JAVA_MODE: "direct", STATECHART_JAVA_ARGS: JSON.stringify([path.join(here, "java.ts")]),
           STATECHART_JAVA: process.env.JAVA ?? "java",
           STATECHART_RECORD: tlc,
         },
@@ -370,7 +371,8 @@ for (const [width, height, config, status, drawn, chart, header] of [
           encoding: "utf8",
           env: {
             ...process.env,
-            JAVA: path.join(here, "java.ts"),
+            JAVA: process.execPath,
+            STATECHART_JAVA_MODE: "direct", STATECHART_JAVA_ARGS: JSON.stringify([path.join(here, "java.ts")]),
             STATECHART_JAVA: process.env.JAVA ?? "java",
             STATECHART_RECORD: tlc,
           },
@@ -428,14 +430,15 @@ test(
   async () => {
     const base = broken();
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-corpus-"));
-    const saved = process.env.TMPDIR;
-    process.env.TMPDIR = tmp;
+    const tempKey = process.platform === "win32" ? "TEMP" : "TMPDIR";
+    const saved = process.env[tempKey];
+    process.env[tempKey] = tmp;
     try {
       await check(`${login}.tla`, `${login}.cfg`);
       await assert.rejects(check(`${base}.tla`, `${base}.cfg`), /SANY could not read/);
     } finally {
-      if (saved === undefined) delete process.env.TMPDIR;
-      else process.env.TMPDIR = saved;
+      if (saved === undefined) delete process.env[tempKey];
+      else process.env[tempKey] = saved;
     }
     const retained = fs.readdirSync(tmp);
     assert.equal(retained.length, 2);

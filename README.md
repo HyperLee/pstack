@@ -1,6 +1,10 @@
-# pstack for Codex
+# pstack for Codex — Windows 專用版本
 
 將「先理解、再分工、以證據驗收」帶進 Codex 的工程工作流套件。
+
+> **此分支 `codex/windows-support` 為原生 Windows / PowerShell 專用版本。**
+> Windows 預設採實體複製安裝，不需要 WSL、Git Bash 或符號連結權限。
+> 與 `main` 分開維護；本次改版不合併回 `main`。請先讀 [Windows 使用指南](docs/windows.md) 與 [驗證紀錄](docs/windows-verification.md)。
 
 本專案改寫自 [Lauren Tan（poteto）的 pstack](https://github.com/cursor/plugins/tree/main/pstack)，相關演講為 [All Code Is Slop (Except Mine) — Lauren Tan, SpaceXSI](https://www.youtube.com/watch?v=O_zcc6Xl12g)。來源快照的套件版本為 **0.15.43**；這個分支維護 Codex 原生版本，保留原作者與 MIT 授權。
 
@@ -24,31 +28,31 @@ flowchart LR
 
 ## 安裝
 
-基本安裝需要 **Python 3.9+**、Git 與支援 skills 的 Codex。主要支援 macOS／Linux 的 POSIX 環境。原生 Windows 尚未驗證；需使用具備相同工具的 Unix 環境，不能直接假定所有 shell 與程序控制功能可用。
+基本安裝需要 **Python 3.9+**、Git 與支援 skills 的 Codex。此版本主要支援原生 Windows / PowerShell，保留 POSIX 入口；目前 POSIX 未在這次 Windows 改版重新實測。
 
 ### 個人使用
 
 在下載的本專案目錄執行：
 
-```bash
-python3 scripts/install-skills.py --user --dry-run
-python3 scripts/install-skills.py --user
+```powershell
+python scripts/install-skills.py --user --mode copy --dry-run
+python scripts/install-skills.py --user --mode copy
 ```
 
-這會在 `~/.agents/skills/` 建立指向本 checkout 的連結。請保留來源目錄與位置；來源內容更新後，連結會讀到更新版本。安裝程式不會修改 Codex 的全域設定或其他 skills。
+Windows 會將完整套件複製到使用者的 `.codex/pstack/`，並將技能實體複製到 `.agents/skills/`，不依賴來源 checkout。只供一個專案使用時，請使用下方專案安裝。POSIX 預設仍使用連結模式；`--mode symlink` 依賴來源 clone。
 
 ### 指定專案使用
 
-```bash
-python3 scripts/install-skills.py --project "/path/to/your/repo" --dry-run
-python3 scripts/install-skills.py --project "/path/to/your/repo"
+```powershell
+python scripts/install-skills.py --project "C:\GitHubFolder\MyNewProject" --mode copy --dry-run
+python scripts/install-skills.py --project "C:\GitHubFolder\MyNewProject" --mode copy
 ```
 
-專案安裝會將完整套件放入目標專案的 `.codex/pstack/`，並在 `.agents/skills/` 建立相對連結。團隊分享時將兩者一併納入版本控制；搬移 checkout 後仍能解析 skills、指南與參考文件。Benny 不會成為一般可探索的 skill。
+Windows 專案安裝會將完整套件放入目標專案的 `.codex/pstack/`，並在 `.agents/skills/` 建立實體技能副本；各副本的 `.pstack-suite.json` 以相對路徑定位完整套件。團隊分享時將兩者一併納入版本控制；搬移 checkout 後仍能解析 skills、指南與參考文件。Benny 不會成為一般可探索的 skill。
 
 相同安裝可重跑；同名路徑或套件內容與來源不同時，安裝程式會在寫入前停止。先檢視衝突再決定要保留或合併的內容，不會覆蓋既有修改。個人與專案層級若同時提供同名 skills，Codex 可能同時顯示兩份；請選定明確來源，不依賴同名自動合併。
 
-安裝後在 Codex 選擇 skill。CLI 可使用 `/skills` 或輸入 `$` 選取，例如 `$poteto-mode`；桌面 App 使用其 skill 選擇介面。若未顯示，開啟新聊天或重新啟動 Codex，再檢查連結是否可讀。
+安裝後在 Codex 選擇 skill。CLI 可使用 `/skills` 或輸入 `$` 選取，例如 `$poteto-mode`；桌面 App 使用其 skill 選擇介面。若未顯示，開啟新聊天或重新啟動 Codex，再檢查技能檔案、定位檔與完整套件是否可讀。
 
 ## 第一次使用
 
@@ -152,8 +156,10 @@ bun watch-pr/watch-pr --help
 
 statechart 的入口如下，完整前置需求與解讀方式見 [skill](skills/statechart/SKILL.md)：
 
-```bash
-sh skills/statechart/scripts/statechart /path/to/Spec.tla --out /path/to/new-output
+```powershell
+$env:JAVA = "C:\Tools\Java\bin\java.exe"
+$env:TLA2TOOLS = "C:\Tools\tla2tools.jar"
+python skills/statechart/scripts/statechart.py "C:\MyProject\Spec.tla" --out "C:\MyProject\Spec-chart" --timeout-ms 60000
 ```
 
 可透過 `TLA2TOOLS` 指向 `tla2tools.jar`，並用 `JAVA` 指定 Java 執行檔；未指定時，原有工具可使用 mise 準備相依環境。執行器會保留暫存工作檔並回報位置，供手動清理。
@@ -162,12 +168,12 @@ sh skills/statechart/scripts/statechart /path/to/Spec.tla --out /path/to/new-out
 
 Python 檢查需要 [requirements-dev.txt](requirements-dev.txt) 的 PyYAML。先執行套件與行為測試，再依需要執行進階測試：
 
-```bash
-python3 scripts/validate.py
-python3 -B -m unittest discover -s tests -v
+```powershell
+python -m pip install -r requirements-dev.txt
+python -X utf8 -B scripts/run-checks.py --full --discovery
 ```
 
-PR watcher 在其 scripts 目錄執行 `bun test watch-pr` 與 `bun run typecheck`。statechart 在其 scripts 目錄執行 `node --test test/*.test.ts`；完整 TLC 測試需設定有效的 Java／TLC。詳細檢查方式與此次驗證範圍見 [移植說明](docs/codex-migration.md)。
+PR watcher 在其 scripts 目錄執行 `bun test watch-pr` 與 `bun run typecheck`。statechart 在其 scripts 目錄執行 `node --test test/*.test.ts`；完整 TLC 測試需設定有效的 Java／TLC。Windows 請使用 `run-checks.py` 選擇對應平台測試，不直接執行 POSIX 專用 CLI 測試。詳細檢查方式與此次驗證範圍見 [移植說明](docs/codex-migration.md)。
 
 測試與執行器不批次刪除目錄。請保留輸出中列出的暫存路徑，確認不再需要後自行手動清理。不要將證據已被刪除的測試當成完整驗證。
 

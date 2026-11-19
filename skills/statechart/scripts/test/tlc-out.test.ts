@@ -18,6 +18,7 @@ const plain = (text: string) => [...plainText(readMessages(text))].join("");
 
 const steady = (text: string) =>
   text
+    .replace(/\r\n/g, "\n")
     .replace(/"chart-[0-9a-f]{32}"/g, '"chart"')
     .replace(/\bfp \d+ and seed -?\d+/g, "fp _ and seed _")
     .replace(/\[pid: \d+\]/g, "[pid: _]")
@@ -50,7 +51,8 @@ test(
             {
               env: {
                 ...process.env,
-                JAVA: path.join(here, "java.ts"),
+                JAVA: process.execPath,
+                STATECHART_JAVA_MODE: "direct", STATECHART_JAVA_ARGS: JSON.stringify([path.join(here, "java.ts")]),
                 STATECHART_JAVA: process.env.JAVA ?? "java",
                 STATECHART_RECORD: tool,
                 STATECHART_PLAIN: twin,

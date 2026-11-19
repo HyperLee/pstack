@@ -472,18 +472,21 @@ describe("context and stack discovery", () => {
   it("requests and parses fork identity from gh before stack discovery", () => {
     const directory = mkdtempSync(join(tmpdir(), "watch-pr-fork-"));
     try {
-      writeFileSync(join(directory, "gh"), `#!/bin/sh
-case "$*" in
-  *number,headRefName,baseRefName,isCrossRepository*) ;;
-  *) exit 2 ;;
-esac
-printf '%s\\n' '[{"number":42,"headRefName":"feature","baseRefName":"main","isCrossRepository":true}]'
-`, { mode: 0o755 });
+      const fixture = join(directory, "gh.mjs");
+      writeFileSync(fixture, `
+if (!process.argv.includes("number,headRefName,baseRefName,isCrossRepository")) process.exit(2);
+console.log(JSON.stringify([{number:42,headRefName:"feature",baseRefName:"main",isCrossRepository:true}]));
+`);
       const program = `import { GhGitHubReader } from ${JSON.stringify(import.meta.dir + "/github.ts")};
-        console.log(JSON.stringify(await new GhGitHubReader().openPullRequests({ owner: "owner", repo: "repo" })));`;
+        import { spawnSync } from 'node:child_process';
+        const reader = new GhGitHubReader(async (argv) => {
+          const child = spawnSync(process.execPath, [${JSON.stringify(fixture)}, ...argv.slice(1)], {encoding:'utf8'});
+          if (child.error) throw child.error;
+          return {code:child.status ?? -1,stdout:child.stdout,stderr:child.stderr};
+        });
+        console.log(JSON.stringify(await reader.openPullRequests({owner:"owner",repo:"repo"})));`;
       const child = spawnSync(process.execPath, ["-e", program], {
-        encoding: "utf8", timeout: 2000,
-        env: { ...process.env, PATH: directory + ":" + process.env.PATH },
+        encoding: "utf8", timeout: 10000,
       });
       expect(child.error).toBeUndefined();
       expect(child.status).toBe(0);

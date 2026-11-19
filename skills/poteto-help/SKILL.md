@@ -7,7 +7,7 @@ description: Guides users through pstack setup, $poteto-mode, and picking the sk
 
 Resolve this file’s canonical path first and read `../poteto-mode/references/codex-runtime.md`. Answer help questions without starting costly implementation work. A direct request to perform work routes to poteto-mode instead.
 
-Read the relevant installed local source before recommending it. The suite README and `docs/guide/` live two directories above the canonical skill folder. Link those local files; the upstream Cursor README is provenance, not Codex usage documentation.
+Read the relevant installed local source before recommending it. Locate the complete suite using `.pstack-suite.json` beside a copied skill, or two directories above a canonical source skill. The README and `docs/guide/` live at that suite root. Link those local files; the upstream Cursor README is provenance, not Codex usage documentation.
 
 - Installation and model/worker budget: README, guide 01, **setup-pstack**.
 - Choose a playbook or word a prompt: guide 02, **poteto-mode**, **sharpen**.

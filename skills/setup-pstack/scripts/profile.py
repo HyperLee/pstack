@@ -49,7 +49,7 @@ def load(project, personal=None):
     for path in paths:
         if path.exists():
             try:
-                return validate(json.loads(path.read_text())), path
+                return validate(json.loads(path.read_text(encoding="utf-8-sig"))), path
             except (ValueError, OSError) as error:
                 raise ValueError(str(path) + ": " + str(error)) from error
     return validate({}), None
@@ -62,7 +62,7 @@ def main():
     args = parser.parse_args()
     try:
         if args.file:
-            result = validate(json.loads(args.file.read_text()))
+            result = validate(json.loads(args.file.read_text(encoding="utf-8-sig")))
         else:
             result, _ = load(args.project)
     except (ValueError, OSError) as error:

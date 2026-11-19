@@ -1,6 +1,7 @@
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -15,7 +16,7 @@ class SafetyTests(unittest.TestCase):
                 continue
             if p.suffix not in (".ts", ".sh", ".py"):
                 continue
-            source = p.read_text()
+            source = p.read_text(encoding="utf-8-sig")
             if (re.search(r'\brm\s+-(?:rf|fr|r)\b', source) or
                     re.search(r'rmSync\([^;]*recursive\s*:\s*true', source, re.S)):
                 bad.append(str(p.relative_to(ROOT)))
@@ -31,7 +32,7 @@ class SafetyTests(unittest.TestCase):
         subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "candidate",
                         str(root / "linked tree")], check=True)
         refs = subprocess.check_output(["git", "-C", str(repo), "show-ref"])
-        result = subprocess.run(["bash", str(ROOT / "skills/poteto-mode/scripts/worktree-audit.sh"),
+        result = subprocess.run([sys.executable, str(ROOT / "skills/poteto-mode/scripts/worktree-audit.py"),
                                  "--offline", "-b", "HEAD", str(repo)], text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(str(root / "linked tree"), result.stdout)
@@ -50,7 +51,7 @@ class SafetyTests(unittest.TestCase):
         linked = root / "registered tree"
         subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "candidate", str(linked)], check=True)
         linked.rename(root / "preserved moved tree")
-        result = subprocess.run(["bash", str(ROOT / "skills/poteto-mode/scripts/worktree-audit.sh"),
+        result = subprocess.run([sys.executable, str(ROOT / "skills/poteto-mode/scripts/worktree-audit.py"),
                                  "--offline", "-b", "HEAD", str(repo)], text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(str(linked), result.stdout)

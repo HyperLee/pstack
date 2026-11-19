@@ -6,7 +6,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { killGroup, messageOf } from "./run.ts";
 
-const USAGE = `Usage: statechart SPEC.tla [--config FILE] [--view FILE] [--out DIR]
+const USAGE = `Usage: statechart SPEC.tla [--config FILE] [--view FILE] [--out DIR] [--timeout-ms N]
 
 Checks SPEC.tla with TLC and draws its state graph as Mermaid. Above 500 states, the chart
 draws only the paths to the rules that break, and with no rule broken there is no chart.mmd.
@@ -23,7 +23,10 @@ and 2 when TLC stops with an error, a signal kills the check, or the command can
 143 when SIGINT or SIGTERM stops the check. Only exits 0 and 1 write output.`;
 
 let stop: NodeJS.Signals | undefined;
+let timedOut = false;
+let requestStop: () => void;
 const stopped = new Promise<void>((resolve) => {
+  requestStop = resolve;
   for (const name of ["SIGINT", "SIGTERM"] as const)
     process.on(name, () => {
       stop ??= name;
@@ -36,11 +39,16 @@ let specFile;
 try {
   const args = parseArgs({
     allowPositionals: true,
-    options: { config: { type: "string" }, view: { type: "string" }, out: { type: "string" } },
+    options: { config: { type: "string" }, view: { type: "string" }, out: { type: "string" },
+               "timeout-ms": { type: "string" } },
   });
   flags = args.values;
   [specFile] = args.positionals;
   if (args.positionals.length !== 1) throw new Error("Give one SPEC.tla.");
+  if (flags["timeout-ms"] !== undefined &&
+      (!/^\d+$/.test(flags["timeout-ms"]) || Number(flags["timeout-ms"]) < 1 ||
+       Number(flags["timeout-ms"]) > 2147483647))
+    throw new Error("--timeout-ms must be an integer from 1 to 2147483647.");
 } catch (error) {
   console.error(`${messageOf(error)}\n\n${USAGE}`);
   process.exit(2);
@@ -83,6 +91,8 @@ try {
   const done = path.join(stage, "done");
   let tmp: string | undefined;
   let janitor: ChildProcess | undefined;
+  let worker: ChildProcess | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let exitCode: number;
   try {
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-"));
@@ -97,23 +107,26 @@ try {
           "--allow-env",
         ]
       : process.execArgv;
-    const worker = spawn(
-      process.execPath,
-      [
+    const windows = process.platform === "win32";
+    const workerArgs = [
         ...runtime,
         path.join(import.meta.dirname, "worker.ts"),
         stage,
         specFile,
         configFile,
         ...(flags.view ? [flags.view] : []),
-      ],
+      ];
+    worker = spawn(
+      windows ? (process.env.PSTACK_PYTHON || "python") : process.execPath,
+      windows ? [path.join(import.meta.dirname, "windows-job.py"), process.execPath, ...workerArgs] : workerArgs,
       {
-        detached: true,
-        stdio: ["ignore", "inherit", "inherit"],
-        env: { ...process.env, TMPDIR: tmp },
+        detached: !windows,
+        windowsHide: true,
+        stdio: [windows ? "pipe" : "ignore", "inherit", "inherit"],
+        env: { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp, PYTHONUTF8: "1" },
       },
     );
-    janitor = spawn(
+    if (!windows) janitor = spawn(
       "/bin/sh",
       [
         "-c",
@@ -125,13 +138,27 @@ try {
       ],
       { detached: true, stdio: ["pipe", "ignore", "ignore"] },
     );
-    const exited = new Promise<number>((resolve) =>
-      worker.on("exit", (code) => resolve(code ?? 2)),
-    );
+    const active = worker;
+    active.stdin?.on("error", () => {}); // EOF can race the supervisor's normal exit.
+    const exited = new Promise<number>((resolve, reject) => {
+      active.on("error", reject);
+      active.on("exit", (code) => resolve(code ?? 2));
+    });
+    if (flags["timeout-ms"]) timer = setTimeout(() => {
+      timedOut = true;
+      requestStop();
+    }, Number(flags["timeout-ms"]));
     await Promise.race([stopped, exited]);
-    await killGroup(worker.pid as number);
+    if (windows) {
+      active.stdin?.end();
+    } else await killGroup(active.pid as number);
+    const force = windows ? setTimeout(() => active.kill(), 5000) : undefined;
     const verdict = await exited;
-    if (stop) {
+    if (force) clearTimeout(force);
+    if (timedOut) {
+      console.error("The check timed out, so the command wrote nothing.");
+      exitCode = 2;
+    } else if (stop) {
       console.error(`${stop} stopped the check, so the command wrote nothing.`);
       exitCode = 128 + os.constants.signals[stop];
     } else if (worker.signalCode) {
@@ -142,17 +169,36 @@ try {
       try {
         fs.renameSync(done, dest);
       } catch (error) {
+        if (process.platform === "win32" &&
+            ["EPERM", "EEXIST", "ENOTEMPTY"].includes(String(codeOf(error))) &&
+            fs.existsSync(dest) && fs.readdirSync(dest).length === 0) {
+          // Windows cannot rename over an empty directory. Retain it beside
+          // the staged result rather than deleting it, and restore on failure.
+          const previous = path.join(stage, "previous-empty-output");
+          fs.renameSync(dest, previous);
+          try {
+            if (fs.readdirSync(previous).length)
+              throw new Error("The output directory changed while publishing; retained original in " + previous);
+            fs.renameSync(done, dest);
+          } catch (publishError) {
+            if (!fs.existsSync(dest)) fs.renameSync(previous, dest);
+            throw publishError;
+          }
+        } else {
         if (codeOf(error) !== "ENOTEMPTY" && codeOf(error) !== "EEXIST") throw error;
         throw new Error(
           `${path.join(out, fs.readdirSync(dest).sort()[0])} appeared while the check ran, so the command wrote nothing. Pass --out with a new folder.`,
           { cause: error },
         );
+        }
       }
       process.stdout.write(fs.readFileSync(path.join(dest, "report.md")));
       console.log(`\nWrote ${out}`);
       exitCode = verdict;
     } else exitCode = 2;
   } finally {
+    if (timer) clearTimeout(timer);
+    if (process.platform === "win32") worker?.stdin?.end();
     console.log(`Retained work files: ${stage}${tmp ? ` and ${tmp}` : ""}`);
     janitor?.kill("SIGKILL");
   }

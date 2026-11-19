@@ -12,6 +12,6 @@
 
 原始 Cursor `Task` 的欄位、指定 cloud environment 與自訂 agent type 都不是可直接送給 Codex 的參數。以當前可呼叫 schema 為準；不把某一版工具名稱硬編碼成所有版本的保證。
 
-Skill 的真實位置必須先解析連結，才能定位完整套件中的 sibling skills、指南與角色參考。個人安裝依賴來源 clone，專案安裝將來源放在專案內，使用相對連結保持可攜性。
+Skill 的位置依 runtime 規約解析：Windows 實體副本使用旁邊的 `.pstack-suite.json` 相對定位完整套件；連結模式解析真實路徑。兩種模式都必須能定位 sibling skills、指南與角色參考。專案安裝的 `.codex/pstack/` 與 `.agents/skills/` 一起納入版本控制。
 
-目前支援範圍以 POSIX 工具環境為基礎；尚未宣稱原生 Windows 或關機後執行能力。
+此分支以原生 Windows / PowerShell 為主要目標，保留 POSIX 入口；詳細需求與驗證狀態見 [Windows 指南](../windows.md)。不保證關機或休眠後持續執行。

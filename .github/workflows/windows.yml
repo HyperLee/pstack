@@ -1,0 +1,52 @@
+name: Windows support
+
+on:
+  push:
+    branches: [codex/windows-support]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  native-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.13'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Prepare test dependencies
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-dev.txt
+          Push-Location skills/poteto-mode/scripts
+          bun install --frozen-lockfile
+          Pop-Location
+          Push-Location skills/statechart/scripts
+          bun install --frozen-lockfile
+          Pop-Location
+          Invoke-WebRequest https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar -OutFile "$env:RUNNER_TEMP/tla2tools.jar"
+          $actual = (Get-FileHash "$env:RUNNER_TEMP/tla2tools.jar" -Algorithm SHA256).Hash
+          if ($actual -ne '936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88') { throw 'TLC checksum mismatch' }
+      - name: Run native Windows checks
+        shell: pwsh
+        run: |
+          $env:JAVA = "$env:JAVA_HOME/bin/java.exe"
+          $env:TLA2TOOLS = "$env:RUNNER_TEMP/tla2tools.jar"
+          $env:PSTACK_TEST_ROOT = "$env:RUNNER_TEMP/pstack-checks"
+          python -X utf8 -B scripts/run-checks.py --full
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-check-logs
+          path: ${{ runner.temp }}/pstack-checks/*.log

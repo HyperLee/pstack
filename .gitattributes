@@ -1,0 +1,16 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.ts text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.tla text eol=lf
+*.cfg text eol=lf
+*.out text eol=lf
+*.dot text eol=lf
+*.mmd text eol=lf
+*.mjs text eol=lf
+*.exit text eol=lf
+skills/statechart/scripts/statechart text eol=lf
+skills/poteto-mode/scripts/watch-pr/watch-pr text eol=lf

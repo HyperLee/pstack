@@ -82,3 +82,9 @@ Render charts with Pele. When the user asks for an image, or a chart is too larg
 Give each chart and its Mermaid text to the person who must decide. Add one line for each bug: the rule, the reader's sentence for that rule, and the path as the report numbers it. Say what the model leaves out. Give the command that makes the files again, with a new `--out` folder.
 
 When the model describes code, replay each bug path against the real code, as a test or a live repro, one step for each action. If a bug does not occur, think that the model is wrong until you show that it is not.
+
+## Native Windows entrypoint
+
+Use `python scripts/statechart.py SPEC.tla --out NEW_DIR --timeout-ms 60000` from this skill folder. Node 22.18–22.x / 23.6+ or Bun 1.1.5+ is required. Set `$env:JAVA` to a Java 11+ executable and `$env:TLA2TOOLS` to an existing tla2tools.jar (validated with 1.7.4). This Windows entrypoint does not require Bash, mise or symlink permissions. A Job Object owns the worker and its descendants; cancellation, timeout and supervisor termination stop that job. Temporary files are retained. `STATECHART_JAVA_ARGS` optionally supplies a JSON array of literal prefix arguments to the Java executable (also used by replay tests); never provide a shell command string.
+
+On Windows the default Java adapter loads the runtime's `jvm.dll` through JNI and supplies UTF-16 paths, including non-codepage characters. `STATECHART_JAVA_ARGS` supplies JVM flags without bypassing this adapter. Only replay/custom executable wrappers should set `STATECHART_JAVA_MODE=direct`; that explicit mode bypasses JNI.

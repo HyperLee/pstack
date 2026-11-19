@@ -8,6 +8,13 @@ const tool = (code: number, level: number, ...lines: string[]) =>
 
 const plain = (text: string) => [...plainText(readMessages(text))].join("");
 
+test("Windows CRLF messages match LF messages from strings and streamed lines", () => {
+  const lf = tool(2110, 1, "Invariant Safe is violated.", "");
+  const crlf = lf.replaceAll("\n", "\r\n");
+  assert.deepEqual([...readMessages(crlf)], [...readMessages(lf)]);
+  assert.deepEqual([...readMessages(crlf.split("\n"))], [...readMessages(lf)]);
+});
+
 test("TLC's -tool output prints as plain TLC prints it", () => {
   const text = [
     tool(2262, 0, "TLC2 Version 2.19 of 08 August 2024 (rev: 5a47802)"),

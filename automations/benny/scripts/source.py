@@ -26,7 +26,7 @@ def main():
     parser.add_argument("--channel", required=True)
     args = parser.parse_args()
     try:
-        result = validate(json.loads(args.file.read_text()), args.channel)
+        result = validate(json.loads(args.file.read_text(encoding="utf-8-sig")), args.channel)
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + "\n")
     print(json.dumps(result, indent=2))

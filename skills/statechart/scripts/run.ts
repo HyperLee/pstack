@@ -67,6 +67,12 @@ export function* fileLines(file: string) {
 const TLC_TOOL =
   "http:tla2tools[url=https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar,checksum=sha256:936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88]@1.7.4";
 const JAVA_TOOL = "java@temurin-25";
+function javaArgs(): string[] {
+  const args: unknown = JSON.parse(process.env.STATECHART_JAVA_ARGS || "[]");
+  if (!Array.isArray(args) || !args.every((arg) => typeof arg === "string"))
+    throw new Error("STATECHART_JAVA_ARGS must be a JSON array of strings");
+  return args;
+}
 export const PINNED_FLAGS = ["-workers", "1", "-fp", "0", "-lncheck", "final"];
 const SANY_ERRORS = /^\*\*\* ?(?:Errors|Abort messages|Parse Error)/m;
 
@@ -93,13 +99,15 @@ const runChild = (file: string, args: string[], options: { cwd: string; env: Nod
     );
   });
 
-export const killGroup = (pid: number) =>
-  new Promise((resolve) =>
-    spawn("/bin/sh", ["-c", 'kill -s KILL -- "-$1"', "sh", String(pid)], { stdio: "ignore" }).on(
-      "exit",
-      resolve,
-    ),
-  );
+export async function killGroup(pid: number) {
+  if (process.platform === "win32")
+    throw new Error("Windows workers must be stopped through their Job Object supervisor");
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) throw error;
+  }
+}
 
 export const messageOf = (error: unknown) =>
   typeof error === "object" &&
@@ -194,6 +202,8 @@ const runToFiles = (
 async function findTlc(cwd: string) {
   const { TLA2TOOLS, JAVA } = process.env;
   if (TLA2TOOLS) return { jar: TLA2TOOLS, java: JAVA || "java" };
+  if (process.platform === "win32")
+    throw new Error("Set TLA2TOOLS to tla2tools.jar and JAVA to a Java 11+ .exe on Windows. No tools were installed.");
   const mise = (...args: string[]) =>
     runChild("mise", args, { cwd, env: { ...process.env, MISE_CEILING_PATHS: cwd } });
   const where = () =>
@@ -293,9 +303,10 @@ export async function check(specFile: string, configFile: string): Promise<Check
     const runJava = (name: string, main: string, args: string[], jvm: string[] = []) => {
       const tmp = path.join(dir, `tmp-${name}`);
       fs.mkdirSync(tmp);
-      return runToFiles(
-        tlc.java,
-        [
+      const prefix = javaArgs();
+      let executable = tlc.java;
+      let arguments_ = [
+          ...prefix,
           `-Djava.io.tmpdir=${tmp}`,
           `-DTLA-Library=${folder}`,
           ...jvm,
@@ -303,7 +314,16 @@ export async function check(specFile: string, configFile: string): Promise<Check
           tlc.jar,
           main,
           ...args,
-        ],
+        ];
+      if (process.platform === "win32" && process.env.STATECHART_JAVA_MODE !== "direct") {
+        const input = path.join(dir, `${name}-java.json`);
+        fs.writeFileSync(input, JSON.stringify({ java: tlc.java, args: arguments_ }));
+        executable = process.env.PSTACK_PYTHON || "python";
+        arguments_ = [path.join(import.meta.dirname, "windows-java.py"), input];
+      }
+      return runToFiles(
+        executable,
+        arguments_,
         {
           cwd: dir,
           out: path.join(dir, name),
