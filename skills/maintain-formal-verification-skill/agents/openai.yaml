@@ -1,0 +1,6 @@
+interface:
+  display_name: "pstack · maintain formal verification skill"
+  short_description: "使用 pstack 的 maintain formal verification skill，依任務需求執行並提供可核對的結果。"
+  default_prompt: "使用 $maintain-formal-verification-skill 處理目前的任務，並提供可核對的結果。"
+policy:
+  allow_implicit_invocation: false

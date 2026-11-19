@@ -1,12 +1,8 @@
-### Authoring or modifying a skill
+# Authoring or modifying a skill
 
-**You own the skill's voice.**
+Read the [Codex runtime contract](../references/codex-runtime.md) before using tools.
 
-1. Use the **create-skill** skill (Cursor's built-in for authoring SKILL.md files).
-2. Validate the skill: frontmatter has `name` and `description`, referenced files exist, cross-skill links resolve.
-3. Test cases if structural. Skip if subjective.
-4. Run **Opening a PR**.
-
-When in doubt, delete. Keep only prose that changes a decision. Tell it to do the thing and skip the reason. Explain only when the rule is confusing without one. Match tone to scope. Point at structural sources (types, READMEs, config) per the **encode-lessons-in-structure** principle skill. Delegate to other skills by path. Don't restate. A workflow you keep hitting but isn't captured → propose a new skill.
-
-**Reply:** summary of the skill, key design decisions, validation notes.
+1. Use the available Codex **skill-creator** and follow the user’s requested placement. Keep pstack dependencies within a complete suite source.
+2. Write only guidance that changes a decision. Put conditional detail in focused references; validate frontmatter, UI metadata and all references.
+3. Verify meaningful behavior with realistic isolated cases, including missing tools and scope boundaries. Clearly label subjective drafts or untested integrations.
+4. Report the capability, decisions and validation. Use Opening a PR only when requested.

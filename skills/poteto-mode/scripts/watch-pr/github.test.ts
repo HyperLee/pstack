@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -491,7 +491,7 @@ printf '%s\\n' '[{"number":42,"headRefName":"feature","baseRefName":"main","isCr
         { number: 42, headRefName: "feature", baseRefName: "main", isCrossRepository: true },
       ]);
     } finally {
-      rmSync(directory, { recursive: true, force: true });
+      // Retain this run\'s directory for manual cleanup.
     }
   });
 

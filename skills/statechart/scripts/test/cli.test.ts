@@ -114,7 +114,7 @@ const launcherTools = () => {
 };
 
 const linkedLauncher = () => {
-  const links = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-links-"));
+  const links = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "statechart-links-")));
   const [first, second] = [path.join(links, "a"), path.join(links, "b")];
   fs.mkdirSync(first);
   fs.mkdirSync(second);
@@ -133,6 +133,7 @@ for (const [how, command] of [
       command: [command()],
       env: { PATH: `${path.dirname(process.execPath)}${path.delimiter}${launcherTools()}` },
     });
+    assert.ifError(r.error);
     assert.equal(r.stderr, "");
     assert.equal(r.status, 1);
     assert.equal(read(path.join(r.out, "chart.mmd")), read(path.join(dir, "chart.mmd")));
@@ -269,8 +270,9 @@ async function signalWhile<T extends { dir: string; reached: (parent: string) =>
   const [status] = await closed;
   assert.equal(stderr, `${signal} stopped the check, so the command wrote nothing.\n`);
   assert.equal(status, 128 + os.constants.signals[signal]);
-  assert.deepEqual(fs.readdirSync(parent), []);
-  assert.deepEqual(fs.readdirSync(tmpdir), []);
+  assert.ok(!fs.existsSync(path.join(parent, "out")), "cancelled run published output");
+  assert.ok(fs.readdirSync(parent).every((name) => name.includes(".statechart-")), "unexpected retained path");
+  assert.ok(fs.readdirSync(tmpdir).every((name) => name.startsWith("statechart-")), "unexpected retained temp path");
   return phase;
 }
 
@@ -295,9 +297,12 @@ async function assertGone(pid: number) {
   }
 }
 
-async function assertEmpty(dir: string) {
-  for (let i = 0; i < 250 && fs.readdirSync(dir).length; i++) await sleep(20);
-  assert.deepEqual(fs.readdirSync(dir), []);
+function assertRetainedWork(dir: string) {
+  const entries = fs.readdirSync(dir);
+  assert.ok(entries.length > 0, "work files should survive cancellation");
+  assert.ok(entries.every((name) => name.includes(".statechart-") || name.startsWith("statechart-")),
+    "only this check's staging/temp folders should remain");
+  assert.ok(!fs.existsSync(path.join(dir, "out")), "cancelled check must not publish output");
 }
 
 function gridCase(n: number) {
@@ -335,7 +340,7 @@ function sleepyJava(fakes: string) {
 }
 
 test(
-  "a SIGKILL of the command stops TLC, removes the temporary folder, and writes nothing",
+  "a SIGKILL of the command stops TLC, retains work files for manual cleanup, and writes nothing",
   { timeout: 30_000 },
   async () => {
     const fakes = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-fakes-"));
@@ -348,13 +353,13 @@ test(
     child.kill("SIGKILL");
     await exited;
     await assertGone(Number(read(pidFile)));
-    await assertEmpty(parent);
-    await assertEmpty(tmpdir);
+    assertRetainedWork(parent);
+    assertRetainedWork(tmpdir);
   },
 );
 
 test(
-  "a SIGKILL of the command while the view draws the chart leaves no folder behind",
+  "a SIGKILL while the view draws stops the worker and retains work files",
   { timeout: 30_000 },
   async () => {
     const fakes = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-fakes-"));
@@ -382,8 +387,8 @@ test(
     await exited;
     fs.writeFileSync(release, "");
     await assertGone(-Number(read(drawing)));
-    await assertEmpty(parent);
-    await assertEmpty(tmpdir);
+    assertRetainedWork(parent);
+    assertRetainedWork(tmpdir);
   },
 );
 
@@ -404,13 +409,14 @@ test(
     const [status] = await closed;
     assert.equal(stderr, "SIGKILL killed the check, so the command wrote nothing.\n");
     assert.equal(status, 2);
-    assert.deepEqual(fs.readdirSync(parent), []);
+    assert.ok(!fs.existsSync(path.join(parent, "out")), "cancelled run published output");
+  assert.ok(fs.readdirSync(parent).every((name) => name.includes(".statechart-")), "unexpected retained path");
   },
 );
 
 for (const signal of ["SIGINT", "SIGTERM"] satisfies NodeJS.Signals[]) {
   test(
-    `${signal} stops TLC, removes the temporary folder, and writes nothing`,
+    `${signal} stops TLC, retains work files for manual cleanup, and writes nothing`,
     { timeout: 30_000 },
     async () => {
       const { pidFile } = await signalWhile(signal, (fakes) => {
@@ -452,18 +458,32 @@ for (const signal of ["SIGINT", "SIGTERM"] satisfies NodeJS.Signals[]) {
     `${signal} while the command writes its files stops it, and it writes nothing`,
     { timeout: 60_000 },
     () =>
-      signalWhile(signal, () => ({
-        dir: gridCase(150),
-        reached: (parent) => {
-          for (const f of fs.readdirSync(parent, { recursive: true, encoding: "utf8" }))
-            if (
-              path.basename(f) === "chart.mmd" &&
-              fs.statSync(path.join(parent, f), { throwIfNoEntry: false })?.size
-            )
-              return true;
-          return false;
-        },
-      })),
+      signalWhile(signal, (fakes) => {
+        const writing = path.join(fakes, "writing");
+        const dir = copyCase("Login", (d) => {
+          const view = path.join(d, "view.mjs");
+          const original = read(view);
+          // Hold a real chart file write so the signal cannot race publication.
+          fs.writeFileSync(view,
+            `import retainedFs from "node:fs";\n` +
+            `const originalOpen = retainedFs.openSync;\n` +
+            `const originalWrite = retainedFs.writeSync;\n` +
+            `const chartDescriptors = new Set();\n` +
+            `retainedFs.openSync = function(file, ...args) {\n` +
+            `  const fd = originalOpen.call(this, file, ...args);\n` +
+            `  if (String(file).endsWith("/chart.mmd")) chartDescriptors.add(fd);\n` +
+            `  return fd;\n` +
+            `};\n` +
+            `retainedFs.writeSync = function(fd, ...args) {\n` +
+            `  if (chartDescriptors.has(fd) && !retainedFs.existsSync(${JSON.stringify(writing)})) {\n` +
+            `    retainedFs.writeFileSync(${JSON.stringify(writing)}, "writing");\n` +
+            `    for (const end = Date.now() + 30_000; Date.now() < end; );\n` +
+            `  }\n` +
+            `  return originalWrite.call(this, fd, ...args);\n` +
+            `};\n` + original);
+        });
+        return { dir, reached: () => fs.existsSync(writing) };
+      }),
   );
 }
 
@@ -496,7 +516,7 @@ spawn(process.execPath, ["-e", ${JSON.stringify(sendWhileRead)}, dot, command, $
     const r = run(path.join(corpus, "Login"), { java, env: { TMPDIR: tmpdir } });
     assert.equal(r.stderr, `${signal} stopped the check, so the command wrote nothing.\n`);
     assert.equal(r.status, 128 + os.constants.signals[signal]);
-    assert.deepEqual(fs.readdirSync(tmpdir), []);
+    assert.ok(fs.readdirSync(tmpdir).every((name) => name.startsWith("statechart-")), "unexpected retained temp path");
     assert.equal(fs.existsSync(r.out), false);
   });
 }

@@ -41,11 +41,12 @@ for (const name of fs.readdirSync(corpus)) {
     );
     assert.equal(r.stderr, "");
     if (process.env.STATECHART_UPDATE) {
-      for (const f of fs.readdirSync(dir))
-        if (/\.(out|exit|dot|mmd|md)$/.test(f)) fs.rmSync(path.join(dir, f));
-      for (const f of fs.readdirSync(tlc)) fs.copyFileSync(path.join(tlc, f), path.join(dir, f));
+      const updated = path.join(tmp, "updated-corpus", name);
+      fs.mkdirSync(updated, { recursive: true });
+      for (const f of fs.readdirSync(tlc)) fs.copyFileSync(path.join(tlc, f), path.join(updated, f));
       for (const f of ["chart.mmd", "report.md"])
-        fs.copyFileSync(path.join(out, f), path.join(dir, f));
+        fs.copyFileSync(path.join(out, f), path.join(updated, f));
+      console.log(`Review generated corpus before replacing individual fixtures: ${updated}`);
     }
     const report = read(path.join(out, "report.md"));
     const first = path.join(dir, "verdict-1.exit");
@@ -422,7 +423,7 @@ for (const [what, tla, where] of [
   );
 
 test(
-  "check() leaves no statechart- folder in the temp dir when it returns and when it throws",
+  "check() retains its work folders on both success and failure",
   { skip },
   async () => {
     const base = broken();
@@ -436,6 +437,8 @@ test(
       if (saved === undefined) delete process.env.TMPDIR;
       else process.env.TMPDIR = saved;
     }
-    assert.deepEqual(fs.readdirSync(tmp), []);
+    const retained = fs.readdirSync(tmp);
+    assert.equal(retained.length, 2);
+    assert.ok(retained.every((name) => name.startsWith("statechart-")));
   },
 );

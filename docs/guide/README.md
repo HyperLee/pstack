@@ -1,38 +1,24 @@
-# The pstack guide
+# pstack 使用指南
 
-pstack works best when you stop micromanaging the agent. You describe what you want and how you'll know it's done. `/poteto-mode` picks the playbook, runs the other skills as the steps need them, and shows you the evidence. This guide teaches that habit with realistic prompts.
+這份指南以 Codex 桌面 App 與 CLI 為對象。先理解工作流，再用一個小而真實的任務建立可驗證的信任。
 
-Here's what you'll learn:
+1. [安裝與設定](01-setup.md)：選擇個人或專案安裝、模型與 worker 數。
+2. [使用主要入口](02-poteto-mode.md)：用目標與完成條件選擇 playbook。
+3. [理解現有程式](03-understand.md)：行為、歷史、教學與工作接續。
+4. [設計與分工](04-design.md)：比較方案、平行覆蓋與反例審查。
+5. [實作與整理](05-build-and-clean.md)：修復、重構、測試與差異檢查。
+6. [驗證與交付](06-verify-and-ship.md)：實際產品、形式驗證、數據與 PR。
+7. [長時間任務](07-overnight.md)：完成條件、紀錄、暫停與恢復。
+8. [工程原則](08-principles.md)：24 個可具體運用的原則。
+9. [建立自己的工作方式](09-make-it-yours.md)：偏好、反思與結構性改善。
+10. [範例與常見問題](10-recipes-and-pitfalls.md)：可直接改寫的任務範例。
 
-1. [Set up pstack](./01-setup.md). Install the plugin and pick your models.
-2. [Route work through `/poteto-mode`](./02-poteto-mode.md). Give it a goal and watch it pick a playbook.
-3. [Understand the code](./03-understand.md). A read-only investigation, then `/how`, `/why`, `/teach`, and `/recall` before you edit anything.
-4. [Design the change](./04-design.md). `/architect`, `/arena`, `/swarm`, `/interrogate`, prototypes, and plans before code locks in a shape.
-5. [Build and clean the change](./05-build-and-clean.md). The build playbooks, `/tdd`, `/unslop`, and `/no-comments`.
-6. [Verify and ship](./06-verify-and-ship.md). Prove behavior on the real app, formally verify what tests rarely reach, vet numbers with `/benchmark-checklist`, then open a focused PR and drive it to merged.
-7. [Run work while you sleep](./07-overnight.md). Trust before loops, an overnight contract, a decision log you can audit, and Projects and automations that scale past one agent.
-8. [Steer with principle names](./08-principles.md). The 24 names that redirect an agent mid-task.
-9. [Make it yours](./09-make-it-yours.md). Your own mode, `/correct` for repeated mistakes, and how to test a skill change.
-10. [Recipes and pitfalls](./10-recipes-and-pitfalls.md). Prompts to copy and mistakes to skip.
+CLI 範例使用 `$skill-name`；桌面 App 可透過其 skill 選擇介面加入相同 skill。檔案中的英文指示不限定回覆語言。
 
-Read the pages in order the first time. After that, each page stands alone.
-
-When you're stuck, or can't tell which skill fits, type [`/poteto-help`](../../skills/poteto-help/SKILL.md) with your question:
+不知道如何開始時：
 
 ```text
-/poteto-help which skill should i use to review this branch?
+$poteto-help 我想審查目前分支，應該使用哪一個 skill？
 ```
 
-It answers, hands you a prompt to send, and links the skill or guide page the answer came from. It doesn't start the work, because a pstack run spends real tokens, so you send the prompt when you're ready. It runs only when you type it.
-
-## If you only remember one thing
-
-Give the agent a goal and a way to check it, in your own words:
-
-```text
-/poteto-mode the export writes duplicate rows when a retry lands mid-run. repro first, then fix and verify.
-```
-
-You don't need to name a playbook or list skills. "repro first" and a checkable outcome are all the routing signal `/poteto-mode` needs. It matches the Bug fix playbook, copies the steps into a todo list, and calls the right skills as each step fires.
-
-Next: [Set up pstack](./01-setup.md).
+Help 會說明與提供範例，不會僅因你問了使用方式就開始昂貴的多代理工作。

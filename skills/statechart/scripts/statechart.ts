@@ -117,7 +117,7 @@ try {
       "/bin/sh",
       [
         "-c",
-        'while read -r line; do :; done; kill -s KILL -- "-$1"; rm -rf -- "$2" "$3"',
+        'while read -r line; do :; done; kill -s KILL -- "-$1"',
         "sh",
         String(worker.pid),
         stage,
@@ -153,8 +153,7 @@ try {
       exitCode = verdict;
     } else exitCode = 2;
   } finally {
-    fs.rmSync(stage, { recursive: true, force: true });
-    if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
+    console.log(`Retained work files: ${stage}${tmp ? ` and ${tmp}` : ""}`);
     janitor?.kill("SIGKILL");
   }
   process.exit(exitCode);

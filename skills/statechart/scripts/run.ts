@@ -501,6 +501,6 @@ export async function check(specFile: string, configFile: string): Promise<Check
       drawing: undefined,
     };
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    // Retain this run\'s directory for manual cleanup.
   }
 }

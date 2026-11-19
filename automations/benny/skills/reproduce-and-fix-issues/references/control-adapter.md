@@ -4,7 +4,7 @@ Benny does not know how to start or drive every app. The user must configure one
 
 Set its skill name in `control.skill_name`.
 
-Set the completed user-facing feature map path in `control.feature_map_path`. Copy and fill [`feature-map.example.md`](./feature-map.example.md) outside `.cursor/automations/benny/` instead of editing the copied example.
+Set the completed user-facing feature map path in `control.feature_map_path`. Copy and fill [`feature-map.example.md`](./feature-map.example.md) outside `.codex/automations/benny/` instead of editing the copied example.
 
 If the skill, feature map, or a required capability is absent, ambiguous, or incomplete, repro and fix work must fail closed.
 
@@ -112,17 +112,9 @@ The recording must show the discriminating final state, not only setup or a load
 
 Stop processes and sessions created by the adapter.
 
-Remove disposable:
+Close debug ports and tunnels this run owns. Retain browser/app profiles, temporary workspaces and captures, and report their paths for manual cleanup. Do not remove directories or batch-unlink their contents. Changes to test accounts or external fixtures require the actual user's separate grant.
 
-- Browser or app profiles
-- Temporary workspaces
-- Test accounts or fixtures when the adapter created them
-- Debug ports and tunnels
-- Captures past their retention window
-
-Return what was stopped, removed, retained, or left for a person.
-
-Cleanup must not delete user work.
+Return what was stopped and retained, plus any manual cleanup needed. Cleanup must not delete user work or evidence.
 
 ## Adapter behavior
 

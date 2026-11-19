@@ -1,0 +1,6 @@
+interface:
+  display_name: "pstack · show me your work"
+  short_description: "使用 pstack 的 show me your work，依任務需求執行並提供可核對的結果。"
+  default_prompt: "使用 $show-me-your-work 處理目前的任務，並提供可核對的結果。"
+policy:
+  allow_implicit_invocation: false

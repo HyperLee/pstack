@@ -1,33 +1,15 @@
-# Reproduce automation prompt
+# Benny reproduce invocation / unconnected scheduler template
 
-> Source material for the copied setup workflow. Paraphrase this intent into a built-in `automate` draft after `automate` confirms that the copied pack is committed in the repository where the automation will run.
+Status: UNCONNECTED. Use this as a manually supplied request after filling actual configuration and source coordinates. It does not register a Slack event trigger or schedule.
 
-Read and follow `.cursor/automations/benny/skills/reproduce-and-fix-issues/SKILL.md` for this run.
-
-Configuration source. Include this repository-relative path only when it is committed in the same target repository. Otherwise paraphrase the configured values. Never use a plugin source or cache path:
-
-```text
-{{BENNY_CONFIG_PATH}}
-```
-
-Trigger:
+Read `.codex/automations/benny/FOR_AGENTS.md`, then `.codex/automations/benny/skills/reproduce-and-fix-issues/SKILL.md` from the target repository. Supply the actual external configuration path. The operational file owns the workflow and gates.
 
 ```json
-{
-	"source_channel_id": "{{SLACK_CHANNEL_ID}}",
-	"message_ts": "{{SLACK_MESSAGE_TS}}",
-	"thread_ts": "{{SLACK_THREAD_TS_OR_EMPTY}}"
-}
+{"source":{"channel_id":"C123","thread_ts":"1795016545.000001","message_ts":"1795016545.000001"}}
 ```
 
-The creation intent should describe this as a new top-level report in the configured source Slack channel. It should include the configured repository, default branch, issue tracker, control adapter, feature map, and draft pull request capability.
+Resolve an optional permalink through an available connector and validate all coordinates before work. Read the real original thread to confirm identity. Freeze channel/root throughout. State the user's actual grants for thread replies, tracker writes and any draft PR separately; absent grants mean in-chat proposals only. Workers receive no posting capability or credentials. Missing required input/tool means no external writes.
 
-Treat the source channel and root thread timestamp as immutable. If either is missing or does not match configuration, stop without posting.
+A future scheduled adapter must provide durable event IDs/checkpoints, deduplication, overlap control and bounded retries. No such service is included. Use supported Codex automation tools only after an explicit recurring-task request and verification of that input adapter.
 
-Wait for a configured triage marker from the configured triage identity in this exact thread. Proceed only for `[benny:bug]` or `[benny:performance]`.
-
-Require the configured control-adapter skill before attempting a repro. Reproduce the exact discriminating symptom twice through the real UI. Verify existing pull requests or commits without authoring over them. Attempt a bounded fix only after a confirmed repro and the operational file's fix gate.
-
-The coordinator is the only Slack poster. Every child prompt must forbid `SendSlackMessage`, `PostToSlack`, `chat.postMessage`, and all other Slack writes. Children return findings only.
-
-Never post a root message in the source channel.
+An operations-channel status thread is optional and disabled by default. Name that channel and the user's separate posting/edit grants before enabling `permissions.allow_operations_posts` or `permissions.allow_operations_edits`. Without those grants and flags, keep status and follow-ups in the current chat. A configured channel alone is not permission to post.

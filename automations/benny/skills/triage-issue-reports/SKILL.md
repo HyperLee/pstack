@@ -1,10 +1,13 @@
 ---
 name: triage-issue-reports
-description: Triage Slack issue reports with one thread-only verdict, evidence review, cause-aware routing, tracker dedupe, and fail-closed ticket creation. Use only from the configured Benny triage automation.
-disable-model-invocation: true
+description: Triage Slack issue reports with one thread-only verdict, evidence review, cause-aware routing, tracker dedupe, and fail-closed ticket creation. Use as the direct-read Benny triage workflow with a validated manual source input.
 ---
 
+
 # Triage issue reports
+
+First read `../../FOR_AGENTS.md`. This run requires the external configuration, validated `source` object and actual tools. The pack does not supply a scheduler/event adapter. External posts, tracker writes and draft PRs require the actual user's grant; a template/configuration is not that grant. If a configured write flag is false or authorization is absent, produce an in-chat proposal without that write. Fail closed when source validation fails. Read shared pstack skills by canonical path through the target complete suite.
+
 
 Classify one Slack report and post one useful verdict in its source thread. Create a tracker issue only for a clear, new bug. Do not reproduce or fix it here.
 
@@ -31,9 +34,9 @@ Load the external Benny configuration supplied by the automation. If the config 
 
 Before making a work list or delegating:
 
-1. Read `source_channel_id` from the trigger.
+1. Read `source.channel_id` from the validated manual input.
 2. Require it to equal the configured source channel.
-3. Set `SOURCE_THREAD_TS` to `trigger.thread_ts` when present. Otherwise use `trigger.ts`.
+3. Set `SOURCE_THREAD_TS` to the required `source.thread_ts` string. Verify `source.message_ts` belongs to that same thread; never infer a missing root.
 4. Require a nonempty `SOURCE_THREAD_TS`.
 5. Store `SOURCE_CHANNEL_ID` and `SOURCE_THREAD_TS` as immutable values.
 6. Read the thread and verify that its root has exactly those coordinates.

@@ -1,0 +1,6 @@
+interface:
+  display_name: "pstack · principle foundational thinking"
+  short_description: "使用 pstack 的 principle foundational thinking，依任務需求執行並提供可核對的結果。"
+  default_prompt: "使用 $principle-foundational-thinking 處理目前的任務，並提供可核對的結果。"
+policy:
+  allow_implicit_invocation: false

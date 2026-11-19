@@ -1,10 +1,12 @@
 ---
 name: unslop
 description: Cut AI tells from any writing.
-disable-model-invocation: true
 ---
 
+
 # Unslop
+
+Before using tools, read [the Codex runtime contract](../poteto-mode/references/codex-runtime.md). Resolve this skill’s canonical path first.
 
 Edit text to remove AI patterns. Scan for the patterns below, then rewrite. Preserve meaning and match the intended tone.
 

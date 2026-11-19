@@ -1,10 +1,13 @@
 ---
 name: reproduce-and-fix-issues
-description: Reproduce triaged Slack bugs through a configured app-control adapter, verify existing fixes, and open a bounded draft pull request only after before-and-after proof. Use only from the configured Benny repro automation.
-disable-model-invocation: true
+description: Reproduce triaged Slack bugs through a configured app-control adapter, verify existing fixes, and open a bounded draft pull request only after before-and-after proof. Use as the direct-read Benny repro workflow with a validated manual source input.
 ---
 
+
 # Reproduce and fix issues
+
+First read `../../FOR_AGENTS.md`. This run requires the external configuration, validated `source` object and actual tools. The pack does not supply a scheduler/event adapter. External posts, tracker writes and draft PRs require the actual user's grant; a template/configuration is not that grant. If a configured write flag is false or authorization is absent, produce an in-chat proposal without that write. Fail closed when source validation fails. Read shared pstack skills by canonical path through the target complete suite.
+
 
 Wait for a trusted triage marker in the source thread. Reproduce the exact symptom through the target app's real UI. Verify an existing fix when one exists. Attempt a bounded fix only after a confirmed repro.
 
@@ -35,8 +38,8 @@ Load the external Benny configuration supplied by the automation. If the config,
 
 Before making a work list or delegating:
 
-1. Require the trigger channel to equal the configured source channel.
-2. Set `SOURCE_THREAD_TS` to `trigger.thread_ts` when present. Otherwise use `trigger.ts`.
+1. Require `source.channel_id` to equal the configured source channel.
+2. Set `SOURCE_THREAD_TS` to the required `source.thread_ts` string. Verify `source.message_ts` belongs to that same thread; never infer a missing root.
 3. Require a nonempty `SOURCE_THREAD_TS`.
 4. Store `SOURCE_CHANNEL_ID` and `SOURCE_THREAD_TS` as immutable values.
 5. Read the source thread and verify its root has those exact coordinates.
@@ -104,7 +107,7 @@ If a person owns the work but has not produced an artifact, stop. Do not race th
 
 ## 4. Open an optional operations thread
 
-If `slack.operations_channel_id` is configured, the coordinator may create one root status message there. This is the only allowed root post in the repro workflow.
+Only when `slack.operations_channel_id` is configured, `permissions.allow_operations_posts` is true, and the actual user explicitly authorized status posts in that named channel may the coordinator create one root status message there. Configuration alone never grants permission. Otherwise skip this lane and keep status in the current chat. This is the only conditionally allowed root post in the repro workflow.
 
 Store its coordinates as `OPERATIONS_CHANNEL_ID` and `OPERATIONS_THREAD_TS`. Never confuse them with the source coordinates.
 
@@ -119,9 +122,9 @@ Use the configured plain Unicode status strings. Keep status text short:
 - Draft pull request opened
 - Fix did not land
 
-Prefer configured Cursor Slack actions. Use `BENNY_SLACK_BOT_TOKEN` only when the user configured it for a narrow missing capability such as editing this one status message. Never expose the token to a worker.
+Prefer the configured, actually available Slack connector actions. Status edits additionally require `permissions.allow_operations_edits` and the user's explicit edit grant. Use `BENNY_SLACK_BOT_TOKEN` only when the user configured it for that authorized narrow capability. Never expose the token to a worker.
 
-If no operations channel is configured, keep detailed status in the automation run output. Do not substitute a source-channel root message.
+If the operations channel, posting grant or posting flag is absent, keep status in the current chat. Do not substitute a source-channel root message. Every later operations-status update and follow-up is conditional on this lane being authorized and its coordinates being established.
 
 ## 5. Load and check the control adapter
 
@@ -137,7 +140,7 @@ Require all seven capabilities:
 4. Inspect state without mutating it.
 5. Capture screenshots.
 6. Start and stop a screen recording.
-7. Clean up processes, sessions, profiles, and temporary data.
+7. Stop owned processes and sessions while retaining profiles, temporary directories and evidence for manual cleanup.
 
 If the adapter is absent or any required capability is missing, mark the operations status as blocked and stop. Do not pretend a screenshot, unit test, state mutation, or source reading is a UI repro.
 
@@ -296,15 +299,15 @@ Only after before-and-after proof:
 
 If pull request creation fails, do not claim success. Keep the commit or branch state in the run output and mark operations status `Fix did not land`.
 
-On success, mark operations status `Draft pull request opened` and post one concise reply in the operations thread with the linked pull request. Do not create a second source-channel root or unprompted source reply.
+On success, report `Draft pull request opened` with its link in the current chat. Update/reply in the operations thread only when its separately authorized lane exists. Do not create a source-channel root or unprompted source reply.
 
 ## 15. Follow-ups and cleanup
 
-Watch the configured operations thread for one follow-up window.
+Watch the established, separately authorized operations thread for one bounded follow-up window. If that lane was skipped, finish with an in-chat summary instead of waiting on or posting to an operations channel.
 
 - Answer a direct question from evidence already gathered.
 - Apply one concrete correction and rerun the repro once when it invalidates the setup.
 - Stay out of human coordination and side chatter.
 - Stop when asked.
 
-Always call the control adapter's cleanup capability. Keep artifacts only as long as the configured retention policy allows.
+Stop only processes this run owns through the control adapter. Retain artifacts and temporary directories, report their locations, and hand directory cleanup to the user. Do not invoke an adapter cleanup that deletes directories.
