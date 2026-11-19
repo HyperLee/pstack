@@ -4,6 +4,8 @@
 
 本專案改寫自 [Lauren Tan（poteto）的 pstack](https://github.com/cursor/plugins/tree/main/pstack)，相關演講為 [All Code Is Slop (Except Mine) — Lauren Tan, SpaceXSI](https://www.youtube.com/watch?v=O_zcc6Xl12g)。來源快照的套件版本為 **0.15.43**；這個分支維護 Codex 原生版本，保留原作者與 MIT 授權。
 
+截至 **2026-11-19**，已比對上游 **0.15.44**。本次更新涉及 Gemini 模型預設與舊設定替換規則，Codex 版維持現有模型繼承與能力檢查，無須同步 skills；詳見[上游更新比對紀錄](docs/codex-migration.md#上游更新比對紀錄)。
+
 原版的重點是讓每個代理都能理解問題、寫出較少而可靠的程式碼，再放心地平行處理獨立工作。這個版本保留 **58 個 skills、22 個 playbooks、24 個工程原則**，將執行工具、模型設定、安裝與協作方式改為適用於 Codex 桌面 App 與 CLI。
 
 ## 先理解它如何運作

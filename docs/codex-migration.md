@@ -6,6 +6,20 @@
 
 原版經 Codex skill-creator 的格式檢查時，有 57 個主要 skills 帶有不接受的 frontmatter 欄位。移植後保留 name／description 等標準欄位，將手動呼叫政策移入 agents/openai.yaml。
 
+## 上游更新比對紀錄
+
+### 2026-11-19：上游 0.15.44
+
+以本機原始快照 `333d3ab`（0.15.43）比對上游固定提交 [`e58dd043600587dbaf58ba315e7f2b38373eeb43`](https://github.com/cursor/plugins/commit/e58dd043600587dbaf58ba315e7f2b38373eeb43)（0.15.44）的 `pstack/` 子目錄，共 551 個檔案，7 個變更，無新增或刪除。此紀錄表示已檢查該上游版本；原始移植基準仍為 0.15.43。
+
+| 上游變更 | Codex 版處理 |
+| --- | --- |
+| arena、poteto-mode 的 Gemini 預設由 Carbon 改為 Neon，推理維持 high 上限 | 維持模型繼承或已確認支援的角色設定，依實際工具能力處理，不加入固定 Gemini 模型名稱或專屬上限 |
+| setup-pstack 自動將 panel 中非 Neon 的舊 Gemini 4 設定替換為 Neon | 保留使用者設定，不自動遷移 Cursor 模型規則；模型覆寫仍須確認當前環境支援 |
+| README、Claude Code harness 文件與兩份 plugin manifest 更新模型名稱或版本 | 保留 Codex 文件與安裝方式，僅補記上游比對結果，不恢復原平台入口 |
+
+結論：此次無須同步 skills、執行工具或設定格式；58 個主要 skills、22 個 playbooks 與 24 個原則的數量不變。
+
 ## 調整對照
 
 | 原始相依 | Codex 版本 |
