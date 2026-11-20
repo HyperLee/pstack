@@ -481,3 +481,168 @@ if ($LASTEXITCODE -ne 0) {
 這是選用的自動停止方式。主要教學採逐段操作、查看預期輸出；若有錯誤，先停止，不要繼續正式安裝。
 
 延伸閱讀：[Windows 使用指南](docs/windows.md)、[完整操作指南](docs/guide/README.md)、[套件 README](README.md)。
+
+## 15. 補充：直接複製的懶人方法
+
+如果你已經有一份安裝完整、可正常載入的 Windows 版 pstack，例如本教學的 `SkillsTestProj`，下次可以直接把它的 **`.agents` 與 `.codex` 兩個資料夾一起複製到新專案根目錄**，不必再次執行正式安裝。
+
+這是另一種取得現有套件副本的方法，前面原有的安裝流程仍可照常使用。此方法適用於本教學的 Windows **實體複製模式**；若來源採用符號連結，不要直接套用這個流程。
+
+### 15.1 操作前先確認範本與新專案
+
+| 角色 | 本節使用的路徑 |
+| --- | --- |
+| 已安裝好的範本專案 | `C:\GitHubFolder\SkillsTestProj` |
+| 新專案根目錄 | `C:\GitHubFolder\NewProject` |
+
+`NewProject` 是示範名稱，請先建立你真正要開發的專案，再換成它的實際根目錄。本節不會替你建立應用程式專案。
+
+目前已確認 `SkillsTestProj` 的 `.agents` 內只有 `skills`，`.codex` 內只有 `pstack`，可以整組作為這次的複製範本。技能定位檔使用相對路徑，沒有綁定 `SkillsTestProj` 這個專案名稱。
+
+日後若範本的這兩個目錄加入了其他技能、專案設定或紀錄，複製前應重新檢視內容，不要把只適用於舊專案的內容一起帶入。
+
+### 15.2 方法一：使用檔案總管複製
+
+1. 開啟 `C:\GitHubFolder\SkillsTestProj`。
+2. 同時選取 `.agents` 與 `.codex`，使用「複製」。
+3. 開啟新專案根目錄，例如 `C:\GitHubFolder\NewProject`。
+4. 確認新專案尚未有 `.agents` 或 `.codex`。若已存在其中任何一個，先停止、比對內容，不要選擇合併或取代。
+5. 使用「貼上」，等待兩個資料夾都複製完成。若看不到這些目錄，可開啟檔案總管顯示隱藏項目的選項。
+6. 保留所有內部檔案，包括 `.pstack-suite.json` 與 `.gitattributes`，不要只挑選 `SKILL.md`。
+
+完成後應是：
+
+```text
+C:\GitHubFolder\NewProject\
+├─ .agents\
+│  └─ skills\
+│     ├─ poteto-mode\
+│     ├─ poteto-help\
+│     └─ 其他技能...
+├─ .codex\
+│  └─ pstack\
+│     ├─ skills\
+│     ├─ docs\
+│     └─ 其他完整套件內容...
+└─ 新專案自己的程式碼...
+```
+
+不要多包一層 `SkillsTestProj`，也不要把兩個目錄放進新專案的 `bin`、`obj` 或其他子目錄。只需要複製這兩個目錄，不必複製範本專案的 `Program.cs`、`.csproj`、`bin` 或 `obj`。
+
+### 15.3 方法二：使用 PowerShell 複製
+
+這與檔案總管方法擇一即可。**若已完成方法一，直接前往第 15.4 節，不要再次執行複製指令。**
+
+先修改 `$NewProject` 為新專案的實際根目錄，再複製執行以下整段。這段會寫入新專案；路徑或目的目錄檢查未通過時會停止。
+
+```powershell
+$TemplateProject = "C:\GitHubFolder\SkillsTestProj"
+$NewProject = "C:\GitHubFolder\NewProject"
+
+& {
+    if (-not (Test-Path -LiteralPath "$TemplateProject\.agents\skills" -PathType Container)) {
+        throw "範本缺少 .agents\skills，停止複製。"
+    }
+    if (-not (Test-Path -LiteralPath "$TemplateProject\.codex\pstack" -PathType Container)) {
+        throw "範本缺少 .codex\pstack，停止複製。"
+    }
+    if (-not (Test-Path -LiteralPath $NewProject -PathType Container)) {
+        throw "新專案目錄不存在，請先確認實際專案路徑。"
+    }
+    if ((Test-Path -LiteralPath "$NewProject\.agents") -or
+        (Test-Path -LiteralPath "$NewProject\.codex")) {
+        throw "新專案已有 .agents 或 .codex，停止複製，請先比對內容。"
+    }
+
+    Copy-Item -LiteralPath "$TemplateProject\.agents" `
+        -Destination "$NewProject\.agents" `
+        -Recurse -Force -ErrorAction Stop
+
+    Copy-Item -LiteralPath "$TemplateProject\.codex" `
+        -Destination "$NewProject\.codex" `
+        -Recurse -Force -ErrorAction Stop
+}
+```
+
+這裡的 `& { ... }` 將檢查與兩次複製放在同一個執行區塊；遇到檢查失敗或複製錯誤時停止後續動作。`-Recurse` 複製子目錄，`-Force` 用於一併處理隱藏項目；它搭配前面的「目的目錄不存在」檢查使用，不是用來覆蓋既有安裝。
+
+這不是交易式安裝：若第二個資料夾複製失敗，第一個可能已經存在。請保留現場、確認錯誤與缺少內容，不要移除檢查後強制重跑，也不要批次刪除目錄。
+
+### 15.4 複製後的唯讀驗證
+
+不論採用方法一或方法二，都應執行本節。這些指令只讀取與預覽，不會再次正式安裝。
+
+**驗證段的 `$NewProject` 必須與剛才實際貼上或複製的目標一致。**
+
+#### A. 確認必要檔案存在
+
+```powershell
+$NewProject = "C:\GitHubFolder\NewProject"
+
+Test-Path -LiteralPath "$NewProject\.agents\skills\poteto-mode\SKILL.md"
+Test-Path -LiteralPath "$NewProject\.agents\skills\poteto-help\.pstack-suite.json"
+Test-Path -LiteralPath "$NewProject\.codex\pstack\docs\guide\README.md"
+```
+
+三個結果都應為 `True`。若不是，先檢查複製是否完成及目錄層級是否正確。
+
+#### B. 確認技能能定位新專案自己的套件
+
+沿用上面的 `$NewProject`：
+
+```powershell
+python -X utf8 `
+    "$NewProject\.agents\skills\poteto-mode\scripts\locate-suite.py" `
+    "$NewProject\.agents\skills\poteto-help\SKILL.md"
+```
+
+本節範例預期輸出：
+
+```text
+C:\GitHubFolder\NewProject\.codex\pstack
+```
+
+重點是輸出必須指向**新專案內部**，不是 `SkillsTestProj` 或原始 `pstack` 來源。若你使用其他專案名稱，輸出路徑也應對應改變。
+
+#### C. 確認技能副本數量
+
+```powershell
+$SkillRoot = Join-Path $NewProject ".agents\skills"
+
+$CopiedSkills = @(
+    Get-ChildItem -LiteralPath $SkillRoot -Directory | Where-Object {
+        (Test-Path -LiteralPath (Join-Path $_.FullName "SKILL.md")) -and
+        (Test-Path -LiteralPath (Join-Path $_.FullName ".pstack-suite.json"))
+    }
+)
+
+$CopiedSkills.Count
+```
+
+依本教學目前的範本版本，預期為 **58**。數量正確仍需搭配必要檔案與定位檢查。
+
+#### D. 選用：預覽套件與技能副本的一致性
+
+可以使用**新專案內附的安裝器**做預覽，不必回到原始來源目錄：
+
+```powershell
+python -X utf8 "$NewProject\.codex\pstack\scripts\install-skills.py" `
+    --project "$NewProject" `
+    --mode copy `
+    --dry-run
+```
+
+預期為 `Would create 0 skill entries (copy)`，且沒有衝突錯誤。這是檢查新專案內套件與技能副本是否一致，不是與網路或原始來源比較最新版；請保留 `--dry-run`，不必再次正式安裝。
+
+### 15.5 在 Codex 開啟新專案
+
+驗證通過後，在 Codex 開啟 `C:\GitHubFolder\NewProject`，建立該專案的新聊天，再選取 `poteto-help` 或 `poteto-mode`。若技能尚未顯示，先開新聊天或重新啟動 Codex，再檢查目錄與定位檔。
+
+以下提示貼在 **Codex 聊天視窗**，不是 PowerShell：
+
+```text
+$poteto-help 請介紹這個新專案可以使用的 pstack skills，
+並說明適合從哪個工作流開始。
+```
+
+這種方式仍然只是專案層級的技能副本，不會建立全域安裝。它保留範本當下的版本，不會自動更新；Bun、GitHub CLI、Java / TLC 等進階工具仍須另外準備。若日後要分享新專案，請一併保留 `.agents/skills` 與 `.codex/pstack`。
