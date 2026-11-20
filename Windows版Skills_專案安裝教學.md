@@ -1,0 +1,476 @@
+# Windows 版 pstack：只在指定專案安裝 skills 的完整教學
+
+本教學適用於 **`codex/windows-support` 分支**，以原生 Windows / PowerShell 示範如何將 pstack 安裝到一個新專案。使用實體複製模式，不需要 WSL、Git Bash、符號連結權限或系統管理員權限。
+
+教學範例使用已實際安裝並檢查的 `SkillsTestProj`。下列正式安裝指令供操作參考；2026-11-20 的完整性檢查沒有重新安裝或修改該專案。
+
+## 1. 先確認兩個不同的路徑
+
+| 角色 | 本教學使用的路徑 | 用途 |
+| --- | --- | --- |
+| 安裝來源 | `C:\GitHubFolder\pstack` | Windows 分支的完整 pstack 原始套件與安裝器 |
+| 目標專案 | `C:\GitHubFolder\SkillsTestProj` | 你正在開發、希望使用 skills 的專案 |
+
+安裝器從來源讀取檔案，將副本放入目標專案。完成後，在 Codex 開啟的是 **`SkillsTestProj`**，才能使用這個專案的 skills。
+
+這次使用的設定為：
+
+- `--project`：安裝到指定專案。
+- `--mode copy`：建立實體技能副本，不建立符號連結。
+- 不使用 `--user`，因此這個操作不建立個人全域技能安裝。
+- 不修改全域 Codex 設定。
+
+專案安裝只決定這份 pstack 的放置範圍；Codex 本來就提供的系統技能或其他已安裝的個人技能仍可能出現在選單中。
+
+## 2. 基本需求
+
+準備以下工具：
+
+| 工具 | 需求 |
+| --- | --- |
+| Python | 3.9 或以上，能從 PowerShell 呼叫 |
+| Git | 能從 PowerShell 呼叫，用來確認來源分支與保存專案版本 |
+| Codex | 使用支援專案 skills 的桌面 App 或 CLI |
+
+一般 skills 的安裝與載入不要求先安裝 Bun、Java 或 TLC。這些是特定進階工具的相依項目，見第 11 節。
+
+開啟一般 PowerShell 視窗，先執行：
+
+```powershell
+python --version
+git --version
+```
+
+若 Python 是透過 Python Launcher 安裝，可以改為：
+
+```powershell
+py -3 --version
+```
+
+本教學後續使用 `python -X utf8 -B`。若你使用 Python Launcher，請統一換成 `py -3 -X utf8 -B`。`-X utf8` 啟用 UTF-8；`-B` 避免產生 Python bytecode 快取。
+
+如果只有 Codex 桌面 App，沒有 CLI，不必為基本安裝特別準備 `codex` 終端機命令。
+
+## 3. 設定來源與目標專案
+
+在同一個 PowerShell 視窗設定變數，後面的步驟會沿用它們：
+
+```powershell
+$PstackSource = "C:\GitHubFolder\pstack"
+$TargetProject = "C:\GitHubFolder\SkillsTestProj"
+
+if (-not (Test-Path -LiteralPath $PstackSource -PathType Container)) {
+    throw "找不到 pstack 來源目錄：$PstackSource"
+}
+
+if (-not (Test-Path -LiteralPath $TargetProject -PathType Container)) {
+    throw "找不到目標專案，請先確認專案根目錄：$TargetProject"
+}
+
+Set-Location -LiteralPath $PstackSource
+git branch --show-current
+```
+
+來源分支應顯示：
+
+```text
+codex/windows-support
+```
+
+目前這個本機來源已在 Windows 分支。若日後顯示其他分支，先用 `git status --short` 檢查是否有未保存的修改，再決定是否切換；不要為了安裝而強制覆寫修改。
+
+目標應選擇你要開啟的專案根目錄。本範例的 `SkillsTestProj.csproj` 就位於該目錄。不要把安裝目標設成 `bin`、`obj`、`Pages` 等子目錄。
+
+**不用先建立 `.agents/skills` 或 `.codex/pstack`，安裝器會處理。**
+
+## 4. 第一次先做安裝預覽
+
+執行以下 PowerShell 指令。此階段只檢查內容與衝突，不寫入檔案：
+
+```powershell
+$Installer = Join-Path $PstackSource "scripts\install-skills.py"
+
+python -X utf8 -B "$Installer" --project "$TargetProject" --mode copy --dry-run
+if ($LASTEXITCODE -ne 0) {
+    throw "安裝預覽未通過，請先檢查上方列出的問題。"
+}
+```
+
+對尚未安裝的全新專案，預期會顯示：
+
+```text
+Would create 58 skill entries (copy)
+```
+
+而 `SkillsTestProj` 已經安裝完成，目前相同來源的預覽結果應是：
+
+```text
+Would create 0 skill entries (copy)
+```
+
+**0 表示沒有缺少或需要新增的技能項目，不是安裝失敗。** 安裝器會檢查完整套件與技能副本；內容相同時不重寫。
+
+若出現 `Existing content differs; nothing changed`，表示同名路徑已被占用或內容不同。先檢視列出的路徑及差異，不要直接覆蓋。
+
+## 5. 正式安裝
+
+只有安裝預覽通過後才執行這一步。下面的命令會寫入目標專案：
+
+```powershell
+python -X utf8 -B "$Installer" --project "$TargetProject" --mode copy
+if ($LASTEXITCODE -ne 0) {
+    throw "安裝未完成，請保留現場並檢查上方錯誤。"
+}
+```
+
+對全新專案，預期顯示：
+
+```text
+Created 58 skill entries (copy)
+```
+
+對已完成相同安裝的 `SkillsTestProj`，再次執行可能顯示：
+
+```text
+Created 0 skill entries (copy)
+```
+
+這也是正常結果，表示不必新增技能副本。
+
+| 指令部分 | 用途 |
+| --- | --- |
+| `"$Installer"` | 呼叫 Windows 分支提供的安裝器 |
+| `--project "$TargetProject"` | 將套件安裝到指定專案 |
+| `--mode copy` | 建立實體檔案，不依賴連結權限 |
+| `--dry-run` | 僅預覽；正式安裝時移除此參數 |
+
+PowerShell 中保留路徑兩側的引號，可以處理含空白或中文的路徑。
+
+## 6. 安裝後會有哪些檔案？
+
+本範例的主要結構如下：
+
+```text
+C:\GitHubFolder\SkillsTestProj\
+├─ .agents\
+│  └─ skills\
+│     ├─ poteto-mode\
+│     │  ├─ SKILL.md
+│     │  ├─ .pstack-suite.json
+│     │  ├─ .gitattributes
+│     │  ├─ references\
+│     │  └─ 其他技能資源...
+│     ├─ poteto-help\
+│     ├─ setup-pstack\
+│     └─ 其他技能...
+│
+├─ .codex\
+│  └─ pstack\
+│     ├─ README.md
+│     ├─ LICENSE
+│     ├─ .gitattributes
+│     ├─ skills\
+│     ├─ docs\
+│     ├─ scripts\
+│     └─ 其他完整套件內容...
+│
+├─ SkillsTestProj.csproj
+├─ Program.cs
+├─ Pages\
+└─ 其他專案檔案...
+```
+
+兩個安裝目錄各有用途：
+
+| 位置 | 用途 |
+| --- | --- |
+| `.agents/skills/` | 讓 Codex 探索及選取技能，內含 58 個 pstack 技能副本 |
+| `.codex/pstack/` | 保存完整套件，包括指南、共用角色、腳本與其他資源 |
+| 技能中的 `.pstack-suite.json` | 以相對路徑，從技能副本定位完整套件 |
+| 安裝副本中的 `.gitattributes` | 固定文字換行規範，降低 Git checkout 造成內容差異的機會 |
+
+因此，**不要只把來源的 `skills` 資料夾手動放進 `.agents/skills`**。那可能讓技能出現在選單中，卻缺少完整套件定位或指南等資源。也不要在 `.agents/skills` 下額外包一層 `skills`。
+
+安裝後兩個目錄都應保留。這份副本不依賴來源 checkout 的原始位置；來源更新也不會自動同步過來。
+
+## 7. 用 PowerShell 驗證安裝
+
+以下指令只讀取安裝內容，不重新安裝。
+
+### 7.1 檢查必要檔案
+
+如果已關閉先前的 PowerShell，先重新設定目標變數：
+
+```powershell
+$TargetProject = "C:\GitHubFolder\SkillsTestProj"
+
+Test-Path -LiteralPath "$TargetProject\.agents\skills\poteto-mode\SKILL.md"
+Test-Path -LiteralPath "$TargetProject\.agents\skills\poteto-help\.pstack-suite.json"
+Test-Path -LiteralPath "$TargetProject\.codex\pstack\docs\guide\README.md"
+```
+
+三個結果都應為 `True`。
+
+### 7.2 計算 pstack 技能副本數量
+
+只計算同時具有 `SKILL.md` 與 pstack 定位檔的資料夾，避免將其他套件的技能算進來：
+
+```powershell
+$SkillRoot = Join-Path $TargetProject ".agents\skills"
+
+$PstackSkills = @(
+    Get-ChildItem -LiteralPath $SkillRoot -Directory | Where-Object {
+        (Test-Path -LiteralPath (Join-Path $_.FullName "SKILL.md")) -and
+        (Test-Path -LiteralPath (Join-Path $_.FullName ".pstack-suite.json"))
+    }
+)
+
+$PstackSkills.Count
+```
+
+此版本預期為 **58**。數量符合只是基本檢查，還要確認定位與載入結果。
+
+### 7.3 確認能找到專案內的完整套件
+
+```powershell
+$Locator = Join-Path $TargetProject ".agents\skills\poteto-mode\scripts\locate-suite.py"
+$HelpSkill = Join-Path $TargetProject ".agents\skills\poteto-help\SKILL.md"
+
+python -X utf8 -B "$Locator" "$HelpSkill"
+if ($LASTEXITCODE -ne 0) {
+    throw "技能無法定位完整套件，請檢查定位檔與目錄結構。"
+}
+```
+
+預期輸出：
+
+```text
+C:\GitHubFolder\SkillsTestProj\.codex\pstack
+```
+
+### 7.4 用安裝預覽核對是否與來源一致
+
+重新設定來源變數後執行：
+
+```powershell
+$PstackSource = "C:\GitHubFolder\pstack"
+$Installer = Join-Path $PstackSource "scripts\install-skills.py"
+
+python -X utf8 -B "$Installer" --project "$TargetProject" --mode copy --dry-run
+if ($LASTEXITCODE -ne 0) {
+    throw "來源與專案安裝內容不同，請檢查差異；不要強制覆寫。"
+}
+```
+
+相同來源應顯示 `Would create 0 skill entries (copy)`，且沒有衝突錯誤。若日後來源分支已有新版本，出現差異不代表舊版一定損壞，而是需要先評估更新。
+
+### 7.5 確認 Codex 實際能載入
+
+前面幾項確認的是磁碟內容。最後應在 Codex 開啟目標專案，確認技能選單或實際探索結果。
+
+若要請 Codex 協助再次檢查，可在目標專案聊天中貼上：
+
+```text
+請以唯讀方式檢查 C:\GitHubFolder\SkillsTestProj 的 pstack 安裝。
+確認 58 個技能與定位檔是否完整、完整套件是否可讀，
+以及 Codex 是否實際探索到該專案的技能。
+不要重新安裝，不要修改專案，也不要啟動多代理實作任務。
+```
+
+套件的 `scripts/check-discovery.py` 是建立暫存專案再驗證的開發工具，並不是直接檢查目前 `SkillsTestProj` 安裝的命令；不要將暫存專案結果誤當成這個目標專案的驗收。
+
+## 8. 在 Codex 開始使用
+
+### 桌面 App
+
+1. 在 Codex 開啟 `C:\GitHubFolder\SkillsTestProj`。
+2. 在該專案建立新聊天。
+3. 透過目前提供的技能選擇介面加入 `poteto-help` 或 `poteto-mode`。
+4. 傳送工作目標與完成條件。
+
+### CLI
+
+若已安裝 Codex CLI，可在 PowerShell 切到目標專案後啟動：
+
+```powershell
+Set-Location -LiteralPath "C:\GitHubFolder\SkillsTestProj"
+codex
+```
+
+進入 Codex 後，可使用 `/skills` 或輸入 `$` 選取技能。
+
+### 聊天提示範例
+
+**以下內容貼在 Codex 聊天視窗，不是在 PowerShell 執行。**
+
+先了解用法：
+
+```text
+$poteto-help 請介紹這個專案可用的 pstack skills，
+以及我應該從哪個 skill 開始。
+```
+
+先唯讀了解測試專案：
+
+```text
+$poteto-mode 請先閱讀 SkillsTestProj，說明主要架構、
+執行方式與現有測試。本次只分析，不修改程式碼。
+```
+
+需要調整分工預算時才使用專案設定：
+
+```text
+$setup-pstack 請使用此專案的設定，繼承目前聊天模型，
+最多同時使用兩個 workers，並說明產生的設定。
+```
+
+`setup-pstack` 不是使用前的必要步驟。安裝完成也不代表每一句聊天都會自動啟動整套工作流；多數技能需要明確選取或呼叫。
+
+## 9. SkillsTestProj 的實際檢查紀錄
+
+檢查日期：**2026-11-20**。對象：`C:\GitHubFolder\SkillsTestProj`。
+
+| 項目 | 實際結果 |
+| --- | --- |
+| pstack 技能副本 | 58 個 |
+| `.pstack-suite.json` 定位檔 | 58 個 |
+| 技能資料夾的連結 | 0 個，使用實體副本 |
+| 全部技能的完整套件定位 | 均指向本專案 `.codex\pstack` |
+| 相同來源的安裝預覽 | 0 個待建立項目，無衝突 |
+| 完整套件靜態驗證 | 無錯誤 |
+| Codex app-server 實際探索 | 58 skills、58 interfaces |
+| 缺少技能或專案載入錯誤 | 0 個 |
+
+這次 app-server 檢查直接指定 `SkillsTestProj`，沒有重新安裝，也沒有啟動模型工作。診斷產物保留在測試用暫存目錄，未寫入目標專案。
+
+以上確認的是基本安裝與技能載入，不代表已在這個專案完成 PR watcher、Java/TLC 或所有技能工作流的實際驗收。當時 PATH 未找到 Bun、Java 與 GitHub CLI；這不影響已通過的基本安裝結果。
+
+這是當日紀錄。日後新增、修改或搬移檔案後，請依第 7 節重新檢查。
+
+## 10. 換另一個專案、團隊分享與更新
+
+### 換另一個新專案
+
+保留來源路徑，將 `$TargetProject` 改成新專案的根目錄，再依序執行預覽、正式安裝與驗證。每個專案各有自己的副本。
+
+```powershell
+$PstackSource = "C:\GitHubFolder\pstack"
+$TargetProject = "C:\GitHubFolder\AnotherProject"
+$Installer = Join-Path $PstackSource "scripts\install-skills.py"
+
+python -X utf8 -B "$Installer" --project "$TargetProject" --mode copy --dry-run
+if ($LASTEXITCODE -ne 0) {
+    throw "預覽未通過，停止安裝。"
+}
+
+python -X utf8 -B "$Installer" --project "$TargetProject" --mode copy
+if ($LASTEXITCODE -ne 0) {
+    throw "安裝未完成，請檢查錯誤。"
+}
+```
+
+此處的 `AnotherProject` 是替換路徑範例，執行前請改成實際專案。
+
+### 隨 Git 專案一起分享
+
+若目標專案使用 Git，將 `.agents/skills/` 與 `.codex/pstack/` 一起納入版本控制，並確認未被專案的 `.gitignore` 排除。其他人 checkout 後才能取得完整技能與資源。
+
+只分享其中一個目錄，可能造成技能無法探索或定位資源失敗。非 Git 專案搬移時也要一併保留這兩個目錄。
+
+### 更新與修改
+
+複製模式是專案自己的快照，不會自動跟隨來源更新。來源或已安裝內容不同時，安裝器會停止，不會自動合併或強制更新。
+
+更新前先檢視版本與差異，再決定遷移方式。若要修改技能，完整套件和註冊副本須維持一致，不要只改其中一份。發現中斷安裝的產物時保留現場供檢查，不批次刪除資料夾。
+
+## 11. 什麼時候需要額外工具？
+
+| 用途 | 額外需求 |
+| --- | --- |
+| 安裝、讀取指南、選取一般 skills | 不需要先準備 Bun、Java 或 TLC |
+| PR watcher | Bun、GitHub CLI、準備好的 watcher 相依套件，以及實際 GitHub 存取權 |
+| Statechart / TLC | 支援的 Node 或 Bun、Java runtime 與 `tla2tools.jar` |
+| 完整套件開發測試 | Python 開發相依套件、Bun、支援的 Node、JDK 與 TLC |
+
+進階工具的版本需求、PowerShell 指令與驗證範圍，請參考 [Windows 使用指南](docs/windows.md) 及 [Windows 版本驗證紀錄](docs/windows-verification.md)。不用為了第一次安裝，一次安裝所有進階工具。
+
+## 12. 常見問題
+
+| 現象 | 檢查與處理方式 |
+| --- | --- |
+| 找不到 `python` | 試用 `py -3 --version`，後續指令統一改用 Python Launcher |
+| `python3` 開啟 Microsoft Store | 使用已驗證可執行的 `python` 或 `py -3`，不要只憑別名判定 Python 已安裝 |
+| 安裝預覽顯示 0 | 若無衝突，表示相同套件已完整存在，屬於正常結果 |
+| 出現 `Existing content differs` | 檢查列出的同名路徑、修改或版本差異；不要強制覆寫 |
+| 詢問符號連結權限 | 確認使用 Windows 分支與 `--mode copy`，不是連結模式 |
+| Codex 看不到技能 | 確認開啟目標專案、安裝層級正確；開新聊天或重新啟動後再檢查選單 |
+| 有技能但找不到指南 | 檢查 `.codex/pstack` 與定位檔是否一起保留，不要只複製 `skills` |
+| 來源更新但目標沒變 | 複製模式不自動同步；先比較差異，再規劃更新 |
+| 想移除舊版或清理目錄 | 先辨識具體安裝路徑與需保留的修改，再由使用者人工處理，不使用遞迴或批次刪除命令 |
+
+## 13. 指令總表
+
+下面分成兩段。第一段會安裝；第二段只驗證。若只想檢查已安裝的 `SkillsTestProj`，使用第二段即可。
+
+### A. 新專案安裝：先預覽，再正式寫入
+
+```powershell
+# 換其他專案時，主要修改這個目標路徑。
+$PstackSource = "C:\GitHubFolder\pstack"
+$TargetProject = "C:\GitHubFolder\SkillsTestProj"
+$Installer = Join-Path $PstackSource "scripts\install-skills.py"
+
+if (-not (Test-Path -LiteralPath $TargetProject -PathType Container)) {
+    throw "請先確認目標專案根目錄：$TargetProject"
+}
+
+$SourceBranch = git -C "$PstackSource" branch --show-current
+if ($LASTEXITCODE -ne 0 -or $SourceBranch -ne "codex/windows-support") {
+    throw "請先確認 pstack 來源位於 codex/windows-support 分支。"
+}
+
+python -X utf8 -B "$Installer" --project "$TargetProject" --mode copy --dry-run
+if ($LASTEXITCODE -ne 0) {
+    throw "預覽未通過，停止安裝。"
+}
+
+python -X utf8 -B "$Installer" --project "$TargetProject" --mode copy
+if ($LASTEXITCODE -ne 0) {
+    throw "安裝未完成，請檢查錯誤。"
+}
+```
+
+### B. 已安裝專案驗證：不重新安裝
+
+```powershell
+$PstackSource = "C:\GitHubFolder\pstack"
+$TargetProject = "C:\GitHubFolder\SkillsTestProj"
+$Installer = Join-Path $PstackSource "scripts\install-skills.py"
+$SkillRoot = Join-Path $TargetProject ".agents\skills"
+
+Test-Path -LiteralPath "$SkillRoot\poteto-mode\SKILL.md"
+Test-Path -LiteralPath "$SkillRoot\poteto-help\.pstack-suite.json"
+Test-Path -LiteralPath "$TargetProject\.codex\pstack\docs\guide\README.md"
+
+$PstackSkills = @(
+    Get-ChildItem -LiteralPath $SkillRoot -Directory | Where-Object {
+        (Test-Path -LiteralPath (Join-Path $_.FullName "SKILL.md")) -and
+        (Test-Path -LiteralPath (Join-Path $_.FullName ".pstack-suite.json"))
+    }
+)
+Write-Output "pstack 技能副本數量：$($PstackSkills.Count)；此版本預期 58。"
+
+python -X utf8 -B "$SkillRoot\poteto-mode\scripts\locate-suite.py" "$SkillRoot\poteto-help\SKILL.md"
+if ($LASTEXITCODE -ne 0) {
+    throw "技能定位檢查失敗。"
+}
+
+python -X utf8 -B "$Installer" --project "$TargetProject" --mode copy --dry-run
+if ($LASTEXITCODE -ne 0) {
+    throw "來源比對未通過，請檢查差異。"
+}
+```
+
+預期看到三個 `True`、58 個技能副本、專案內的完整套件路徑，以及 `Would create 0 skill entries (copy)`。再在 Codex 開啟目標專案並選取技能，就能開始使用。
+
+延伸閱讀：[Windows 使用指南](docs/windows.md)、[完整操作指南](docs/guide/README.md)、[套件 README](README.md)。
