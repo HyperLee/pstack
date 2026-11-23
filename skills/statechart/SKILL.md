@@ -12,15 +12,19 @@ The chart shows how a system moves between states, in the words of the person wh
 
 ## Run
 
-Work in a scratch folder outside the repo. Write a TLA+ spec and its config. Then run:
+Work in a scratch folder outside the repo. Write a TLA+ spec and its config. On macOS and Linux, use the POSIX launcher.
 
 ```sh
 <skill dir>/scripts/statechart SPEC.tla [--config FILE] [--view FILE] [--out DIR]
 ```
 
-`scripts/statechart.ts` is TypeScript, so run it with a runtime that can execute TypeScript.
+On native Windows, run the TypeScript entry point directly with Node 22.18 to 22.x or Node 23.6 or later. Choose an output folder that does not exist yet.
 
-The first run installs TLC and Java with mise and needs the network.
+```powershell
+node --disable-warning=ExperimentalWarning "<skill dir>\scripts\statechart.ts" .\Spec.tla --out .\new-output
+```
+
+For a local TLC installation, set `TLA2TOOLS` to the absolute path of `tla2tools.jar` and `JAVA` to the Java executable if it is outside PATH. Use this method on Windows if mise is available only through a `.cmd` shim. Otherwise, the first run can install TLC and Java with mise and needs the network.
 
 ## Write the spec
 

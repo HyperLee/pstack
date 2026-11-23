@@ -4,7 +4,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { killGroup, messageOf } from "./run.ts";
+import { groupOutlivesWorker, killGroup } from "./kill.ts";
+import { messageOf } from "./run.ts";
+
+const windows = process.platform === "win32";
+const outputFolder = windows ? "a new folder" : "a new or empty folder";
 
 const USAGE = `Usage: statechart SPEC.tla [--config FILE] [--view FILE] [--out DIR]
 
@@ -16,8 +20,8 @@ draws only the paths to the rules that break, and with no rule broken there is n
                  array for parent states, or an object for regions. Default: each state's values.
                  colors gives each group blue, orange, purple, yellow, teal, tan, or pink.
   --out DIR      Where to write report.md, chart.mmd, tlc.out, and tlc-RULE.out for each
-                 property that breaks and each rule that breaks off the chart. The folder must
-                 be new or empty. Default: SPEC-chart.
+                 property that breaks and each rule that breaks off the chart. Use
+                 ${outputFolder}. Default: SPEC-chart.
 Exit code: TLC's own on the config as written: 0 when every rule holds, 1 when a rule breaks,
 and 2 when TLC stops with an error, a signal kills the check, or the command cannot run. 130 or
 143 when SIGINT or SIGTERM stops the check. Only exits 0 and 1 write output.`;
@@ -54,11 +58,11 @@ try {
   if (!fs.existsSync(configFile))
     throw new Error(`Cannot find the TLC config ${configFile}. Pass --config FILE.`);
   const out = flags.out ?? specFile.replace(/\.tla$/, "-chart");
-  let entries: string[] = [];
+  let entries: string[] | undefined;
   let dest: string;
   try {
-    entries = fs.readdirSync(out);
     dest = fs.realpathSync(out);
+    entries = fs.readdirSync(dest);
   } catch (error) {
     if (codeOf(error) !== "ENOENT")
       throw new Error(
@@ -72,13 +76,20 @@ try {
       );
     dest = path.resolve(out);
   }
-  if (entries.length)
+  if (entries?.length)
     throw new Error(
-      `${out} is not empty. It has ${entries.sort()[0]}. The command writes only to a new or empty folder. Pass --out with a new folder.`,
+      `${out} is not empty. It has ${entries.sort()[0]}. The command writes only to ${outputFolder}. Pass --out with a new folder.`,
     );
+  if (windows && entries)
+    throw new Error(`${out} already exists. On Windows, pass --out with a new folder.`);
 
   let base = path.dirname(dest);
-  while (!fs.existsSync(base)) base = path.dirname(base);
+  while (!fs.existsSync(base)) {
+    const parent = path.dirname(base);
+    if (parent === base)
+      throw new Error(`${out} cannot be the output folder. ${base} is unavailable. Pass --out with a new folder.`);
+    base = parent;
+  }
   const stage = fs.mkdtempSync(path.join(base, `.${path.basename(dest)}.statechart-`));
   const done = path.join(stage, "done");
   let tmp: string | undefined;
@@ -110,26 +121,46 @@ try {
       {
         detached: true,
         stdio: ["ignore", "inherit", "inherit"],
-        env: { ...process.env, TMPDIR: tmp },
+        windowsHide: true,
+        env: { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp },
       },
     );
-    janitor = spawn(
-      "/bin/sh",
-      [
-        "-c",
-        'while read -r line; do :; done; kill -s KILL -- "-$1"',
-        "sh",
-        String(worker.pid),
-        stage,
-        tmp,
-      ],
-      { detached: true, stdio: ["pipe", "ignore", "ignore"] },
-    );
-    const exited = new Promise<number>((resolve) =>
-      worker.on("exit", (code) => resolve(code ?? 2)),
-    );
-    await Promise.race([stopped, exited]);
-    await killGroup(worker.pid as number);
+    const exited = new Promise<number>((resolve, reject) => {
+      worker.once("error", reject);
+      worker.once("exit", (code) => {
+        if (windows) janitor?.stdin?.write("exited\n");
+        resolve(code ?? 2);
+      });
+    });
+    const pid = worker.pid;
+    const running = () => worker.exitCode === null && worker.signalCode === null;
+    try {
+      if (pid !== undefined) {
+        janitor = spawn(
+          process.execPath,
+          [...runtime, path.join(import.meta.dirname, "janitor.ts"), String(pid)],
+          { detached: true, stdio: ["pipe", "ignore", "ignore"], windowsHide: true },
+        );
+        janitor.stdin?.on("error", () => {});
+      }
+      const monitorFailed = new Promise<never>((_, reject) => {
+        janitor?.once("error", reject);
+        janitor?.once("exit", () => reject(new Error("The statechart worker monitor stopped unexpectedly.")));
+      });
+      await Promise.race([stopped, exited, monitorFailed]);
+    } finally {
+      if (pid !== undefined && (running() || groupOutlivesWorker)) {
+        try {
+          await killGroup(pid);
+        } catch (error) {
+          // taskkill can report a missing process when it exits on its own.
+          if (!windows || running()) {
+            if (running()) worker.kill("SIGKILL");
+            throw error;
+          }
+        }
+      }
+    }
     const verdict = await exited;
     if (stop) {
       console.error(`${stop} stopped the check, so the command wrote nothing.`);
@@ -142,9 +173,15 @@ try {
       try {
         fs.renameSync(done, dest);
       } catch (error) {
-        if (codeOf(error) !== "ENOTEMPTY" && codeOf(error) !== "EEXIST") throw error;
+        const code = codeOf(error);
+        const conflict = code === "ENOTEMPTY" || code === "EEXIST" ||
+          (windows && (code === "EPERM" || code === "EACCES"));
+        if (!conflict) throw error;
+        const exists = fs.lstatSync(dest, { throwIfNoEntry: false });
+        if (!exists) throw error;
+        const entry = exists.isDirectory() ? fs.readdirSync(dest).sort()[0] : undefined;
         throw new Error(
-          `${path.join(out, fs.readdirSync(dest).sort()[0])} appeared while the check ran, so the command wrote nothing. Pass --out with a new folder.`,
+          `${entry ? path.join(out, entry) : out} appeared while the check ran, so the command wrote nothing. Pass --out with a new folder.`,
           { cause: error },
         );
       }

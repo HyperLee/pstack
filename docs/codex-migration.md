@@ -8,6 +8,13 @@
 
 ## 上游更新比對紀錄
 
+### 2026-11-24 比對上游 0.15.45 與 0.15.46
+
+以上次比對的 0.15.44 為起點，核對至 0.15.46 的 `pstack/`。上游新增兩份 `statechart` 程序控制腳本，主要技能仍為 58 個，Codex 移植來源快照仍是 0.15.43。 [0.15.44 至 0.15.46 差異](https://github.com/cursor/plugins/compare/e58dd043600587dbaf58ba315e7f2b38373eeb43...0b46ec399d55f2829e88822998f53b84944837d3)
+
+- **0.15.45** 將 Gemini 4 Neon 的 panel 預設提高至 `xhigh`，並調整既有設定遷移與預算映射。Codex 版沿用模型繼承與實際工具能力檢查，使用者的模型 profile 由使用者管理。 [上游提交](https://github.com/cursor/plugins/commit/dd24b6707267cd89c6621c4efc6fa91a1d0666ec)
+- **0.15.46** 移植 `statechart` 的 LF／CRLF 解析、直接使用 Node 的 Windows 入口、Java／mise 啟動設定，以及依平台終止程序的邏輯。Codex 版保留暫存資料供手動清理。原生 Windows 輸出使用尚不存在的目錄，POSIX 也接受既有空目錄。 [上游提交](https://github.com/cursor/plugins/commit/0b46ec399d55f2829e88822998f53b84944837d3)
+
 ### 2026-11-19：上游 0.15.44
 
 以本機原始快照 `333d3ab`（0.15.43）比對上游固定提交 [`e58dd043600587dbaf58ba315e7f2b38373eeb43`](https://github.com/cursor/plugins/commit/e58dd043600587dbaf58ba315e7f2b38373eeb43)（0.15.44）的 `pstack/` 子目錄，共 551 個檔案，7 個變更，無新增或刪除。此紀錄表示已檢查該上游版本；原始移植基準仍為 0.15.43。

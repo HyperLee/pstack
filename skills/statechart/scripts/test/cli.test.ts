@@ -85,22 +85,138 @@ const named = (report: string) => {
   return files;
 };
 
+function assertCorpusReplay(name: string, dir: string) {
+  const fixture = path.join(corpus, name);
+  const r = run(dir);
+  assert.ifError(r.error);
+  assert.equal(r.stderr, "");
+  const first = path.join(dir, "verdict-1.exit");
+  const plain = fs.existsSync(first) ? Number(read(first)) : 0;
+  assert.equal(r.status, plain === 0 ? 0 : [11, 12, 13].includes(plain) ? 1 : 2);
+  assert.equal(r.report, read(path.join(fixture, "report.md")));
+  assert.equal(read(path.join(r.out, "chart.mmd")), read(path.join(fixture, "chart.mmd")));
+  assert.deepEqual(r.files, ["chart.mmd", "report.md", "tlc.out", ...named(r.report)].sort());
+  for (const f of r.files) assert.doesNotMatch(read(path.join(r.out, f)), /\r|@!@!@/, f);
+  assert.match(r.configs.ChartRun, /^INVARIANT ChartMark$/m);
+  assert.match(r.configs.ChartRun, /^CONSTRAINT ChartBudget$/m);
+}
+
 for (const name of fs.readdirSync(corpus)) {
   test(`${name} writes the committed chart and report from TLC's output`, () => {
-    const dir = path.join(corpus, name);
-    const r = run(dir);
-    assert.equal(r.stderr, "");
-    const first = path.join(dir, "verdict-1.exit");
-    const plain = fs.existsSync(first) ? Number(read(first)) : 0;
-    assert.equal(r.status, plain === 0 ? 0 : [11, 12, 13].includes(plain) ? 1 : 2);
-    assert.equal(r.report, read(path.join(dir, "report.md")));
-    assert.equal(read(path.join(r.out, "chart.mmd")), read(path.join(dir, "chart.mmd")));
-    assert.deepEqual(r.files, ["chart.mmd", "report.md", "tlc.out", ...named(r.report)].sort());
-    for (const f of r.files) assert.doesNotMatch(read(path.join(r.out, f)), /@!@!@/, f);
-    assert.match(r.configs.ChartRun, /^INVARIANT ChartMark$/m);
-    assert.match(r.configs.ChartRun, /^CONSTRAINT ChartBudget$/m);
+    assertCorpusReplay(name, path.join(corpus, name));
+  });
+  test(`${name} writes the committed chart and report with CRLF tool output`, () => {
+    const dir = copyCase(name, (copy) => {
+      for (const entry of fs.readdirSync(copy)) {
+        if (!entry.endsWith(".out") && entry !== "graph.dot") continue;
+        const file = path.join(copy, entry);
+        fs.writeFileSync(file, read(file).replaceAll(/\r?\n/g, "\r\n"));
+      }
+    });
+    assertCorpusReplay(name, dir);
   });
 }
+
+function preloadedCommand(source: string) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-preload-"));
+  const preload = path.join(dir, "preload.mjs");
+  fs.writeFileSync(preload, source);
+  return [
+    process.execPath,
+    `--import=${pathToFileURL(preload).href}`,
+    path.join(here, "../statechart.ts"),
+  ];
+}
+
+test("the statechart CLI manages its worker without a POSIX shell", () => {
+  const command = preloadedCommand(`import childProcess from "node:child_process";
+import { syncBuiltinESMExports } from "node:module";
+const { spawn } = childProcess;
+childProcess.spawn = (file, ...args) => {
+  if (file === "/bin/sh") throw new Error("statechart spawned /bin/sh");
+  return spawn(file, ...args);
+};
+syncBuiltinESMExports();
+`);
+  const dir = path.join(corpus, "FirstRule");
+  const r = run(dir, { command });
+  assert.ifError(r.error);
+  assert.equal(r.stderr, "");
+  assert.equal(r.status, 1);
+  assert.equal(r.report, read(path.join(dir, "report.md")));
+});
+
+test("discovery of an output folder stops when no ancestor exists", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-missing-root-"));
+  const out = path.join(dir, "missing", "out");
+  const ancestors = [];
+  for (let base = path.dirname(out); ; base = path.dirname(base)) {
+    ancestors.push(base);
+    if (path.dirname(base) === base) break;
+  }
+  const command = preloadedCommand(`import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+const ancestors = new Set(${JSON.stringify(ancestors)});
+const root = ${JSON.stringify(ancestors.at(-1))};
+let visits = 0;
+const { existsSync } = fs;
+fs.existsSync = (file) => {
+  if (file === root && ++visits > 1) throw new Error("revisited unavailable root");
+  return ancestors.has(file) ? false : existsSync(file);
+};
+syncBuiltinESMExports();
+`);
+  const r = run(path.join(corpus, "Login"), { args: ["--out", out], command });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /cannot be the output folder.*Pass --out with a new folder/);
+  assert.equal(fs.existsSync(out), false);
+});
+
+test("a Windows taskkill failure is reported to the caller", () => {
+  const kill = new URL("../kill.ts", import.meta.url).href;
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", `
+import assert from "node:assert/strict";
+import childProcess from "node:child_process";
+import { EventEmitter } from "node:events";
+import { syncBuiltinESMExports } from "node:module";
+import path from "node:path";
+Object.defineProperty(process, "platform", { value: "win32" });
+process.env.SystemRoot = ${JSON.stringify("C:\\Windows")};
+const calls = [];
+childProcess.spawn = (file, args) => {
+  calls.push([file, args]);
+  const child = new EventEmitter();
+  queueMicrotask(() => child.emit("exit", 5));
+  return child;
+};
+syncBuiltinESMExports();
+const { killGroup } = await import(${JSON.stringify(kill)});
+await assert.rejects(killGroup(42), /taskkill.*exit 5/);
+assert.deepEqual(calls, [
+  [path.win32.join(process.env.SystemRoot, "System32", "taskkill.exe"), ["/pid", "42", "/t", "/f"]],
+]);
+`], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test("TLC and SANY receive UTF-8 settings for Java's default and standard streams", () => {
+  const command = preloadedCommand(`import childProcess from "node:child_process";
+import { syncBuiltinESMExports } from "node:module";
+const { spawn } = childProcess;
+childProcess.spawn = (file, args, ...rest) => {
+  if (file === process.env.JAVA) {
+    for (const property of ["file", "stdout", "stderr"])
+      if (!args.includes("-D" + property + ".encoding=UTF-8"))
+        throw new Error("missing JVM " + property + " encoding");
+  }
+  return spawn(file, args, ...rest);
+};
+syncBuiltinESMExports();
+`);
+  const r = run(path.join(corpus, "Login"), { command });
+  assert.equal(r.stderr, "");
+  assert.equal(r.status, 0);
+});
 
 const launcher = path.join(here, "../statechart");
 

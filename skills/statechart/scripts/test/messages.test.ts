@@ -1,12 +1,39 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import { plainText, runtime } from "../backends/plain-text.ts";
 import { readMessages } from "../frontends/messages.ts";
+import { readVerdict } from "../frontends/verdict.ts";
+import { PART } from "../ir.ts";
+import { fileLines } from "../run.ts";
 
 const tool = (code: number, level: number, ...lines: string[]) =>
   [`@!@!@STARTMSG ${code}:${level} @!@!@`, ...lines, `@!@!@ENDMSG ${code} @!@!@`].join("\n");
 
 const plain = (text: string) => [...plainText(readMessages(text))].join("");
+
+test("FirstRule reports the same broken invariant for LF, CRLF and mixed TLC output", () => {
+  const lf = fs.readFileSync(new URL("corpus/FirstRule/verdict-1.out", import.meta.url), "utf8");
+  const verdict = readVerdict(readMessages(lf));
+  assert.deepEqual(verdict.broke, { kind: "invariant", name: "NotOne" });
+  const crlf = lf.replaceAll("\n", "\r\n");
+  const mixed = crlf.replaceAll(/(^@!@!@ENDMSG [^\r\n]+)\r\n/gm, "$1\n");
+  for (const text of [crlf, mixed]) {
+    assert.deepEqual(readVerdict(readMessages(text)), verdict);
+    assert.equal(plain(text), plain(lf));
+  }
+});
+
+test("fileLines handles CRLF split between reads and an unterminated last line", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-lines-"));
+  const file = path.join(dir, "output.txt");
+  fs.writeFileSync(file, `${"x".repeat(PART - 3)}\nA\r\nB\nC`);
+  const [first, ...rest] = fileLines(file);
+  assert.equal(first.length, PART - 3);
+  assert.deepEqual(rest, ["A", "B", "C"]);
+});
 
 test("TLC's -tool output prints as plain TLC prints it", () => {
   const text = [

@@ -59,3 +59,10 @@ bash scripts/run-checks.sh
 ## 未驗證的外部範圍
 
 未發送真實 Slack 訊息、修改真實 tracker、建立排程、觸發外部 webhook 或合併真實 PR。這些仍是需要工具、設定與授權的選配整合。原生 Windows、其他作業系統，以及桌面 skill 選擇介面的逐項操作尚未完整實測，不以此次 macOS／原生探索結果代替。
+
+## 2026-11-24 statechart 相容性更新
+
+- 在 macOS arm64 使用 Node 26.13.0、Temurin 25.0.5.1 與 TLC 1.7.4 執行完整 `statechart` 測試，412／412 通過，0 skipped。涵蓋 33 個 CRLF 重播案例、串流邊界、真實 TLC、renderer、程序中止及暫存保留。
+- 另外用 Bun 1.4.4 與 Deno 2.9.6 驗證真實 TLC 可辨識 `NotOne`，並確認執行中的 CLI 收到 `SIGKILL` 後會停止測試子程序並保留暫存資料。
+- 套件 validator 與 15 項 Python 測試全數通過。Codex app-server 探索到 58 個技能與 58 份介面資訊，0 個解析錯誤。
+- Windows 的 `taskkill` 錯誤與既有輸出目錄檢查已用模擬環境驗證。原生 Windows 的 Java／TLC 啟動、輸出及中止仍待實機驗證。

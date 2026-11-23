@@ -4,7 +4,7 @@
 
 本專案改寫自 [Lauren Tan（poteto）的 pstack](https://github.com/cursor/plugins/tree/main/pstack)，相關演講為 [All Code Is Slop (Except Mine) — Lauren Tan, SpaceXSI](https://www.youtube.com/watch?v=O_zcc6Xl12g)。來源快照的套件版本為 **0.15.43**；這個分支維護 Codex 原生版本，保留原作者與 MIT 授權。
 
-截至 **2026-11-19**，已比對上游 **0.15.44**。本次更新涉及 Gemini 模型預設與舊設定替換規則，Codex 版維持現有模型繼承與能力檢查，無須同步 skills；詳見[上游更新比對紀錄](docs/codex-migration.md#上游更新比對紀錄)。
+截至 **2026-11-24**，已比對上游 **0.15.46**，並移植 `statechart` 的 TLC 換行解析與 Windows 程序控制修正。Codex 的模型選擇沿用現有的繼承與工具能力檢查。[上游更新比對紀錄](docs/codex-migration.md#上游更新比對紀錄)
 
 原版的重點是讓每個代理都能理解問題、寫出較少而可靠的程式碼，再放心地平行處理獨立工作。這個版本保留 **58 個 skills、22 個 playbooks、24 個工程原則**，將執行工具、模型設定、安裝與協作方式改為適用於 Codex 桌面 App 與 CLI。
 
@@ -24,7 +24,7 @@ flowchart LR
 
 ## 安裝
 
-基本安裝需要 **Python 3.9+**、Git 與支援 skills 的 Codex。主要支援 macOS／Linux 的 POSIX 環境。原生 Windows 尚未驗證；需使用具備相同工具的 Unix 環境，不能直接假定所有 shell 與程序控制功能可用。
+基本安裝需要 **Python 3.9+**、Git 與支援 skills 的 Codex。套件安裝與工作流主要支援 macOS／Linux。`statechart` 的原生 Windows 指令見[進階工具](#進階工具)，原生 Windows 實機驗證仍待補充。
 
 ### 個人使用
 
@@ -152,13 +152,21 @@ bun watch-pr/watch-pr --help
 
 執行 watcher 不會自動安裝套件或修改來源。若來源唯讀且尚未準備相依套件，先由擁有者準備，或使用目前可用的 `gh`／forge 工具監看。
 
-statechart 的入口如下，完整前置需求與解讀方式見 [skill](skills/statechart/SKILL.md)：
+在 macOS 或 Linux 使用 statechart 的 shell 啟動器。
 
 ```bash
 sh skills/statechart/scripts/statechart /path/to/Spec.tla --out /path/to/new-output
 ```
 
-可透過 `TLA2TOOLS` 指向 `tla2tools.jar`，並用 `JAVA` 指定 Java 執行檔；未指定時，原有工具可使用 mise 準備相依環境。執行器會保留暫存工作檔並回報位置，供手動清理。
+在原生 Windows，使用 Node 22.18 至 22.x，或 Node 23.6 以上，並將 `--out` 指定為尚不存在的路徑。
+
+```powershell
+$env:TLA2TOOLS = 'C:\tools\tla2tools.jar'
+$env:JAVA = 'C:\tools\jdk-25\bin\java.exe'
+node --disable-warning=ExperimentalWarning ".\skills\statechart\scripts\statechart.ts" .\Spec.tla --out .\new-output
+```
+
+依實際安裝位置設定上述路徑。若 Windows 的 mise 只透過 `.cmd` shim 提供，請使用這種方式直接指定 Java 和 TLC。其他環境可用 mise 準備相依環境。執行器會保留暫存工作檔並回報位置。[statechart 技能](skills/statechart/SKILL.md)
 
 ## 驗證與開發
 
