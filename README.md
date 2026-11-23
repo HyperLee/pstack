@@ -39,6 +39,8 @@ python3 scripts/install-skills.py --user
 
 ### 指定專案使用
 
+第一次在 macOS 安裝，請參考 [macOS 版 Skills 專案安裝教學](docs/macOS版Skills_專案安裝教學.md)。
+
 ```bash
 python3 scripts/install-skills.py --project "/path/to/your/repo" --dry-run
 python3 scripts/install-skills.py --project "/path/to/your/repo"
