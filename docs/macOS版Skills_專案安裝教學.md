@@ -116,17 +116,23 @@ for skill in skills:
     if not link.is_symlink() or Path(os.readlink(link)).is_absolute():
         sys.exit(f"缺少相對符號連結：{link}")
     if (link / "SKILL.md").resolve() != skill or not skill.is_file():
-        sys.exit(f"連結未指向套件內可讀取的技能：{link}")
+        sys.exit(f"連結未指向套件內的技能檔案：{link}")
 
 print(f"已確認 58 個技能連結都指向 {bundle}")
 PY
 ```
 
-若要比對來源版本，再用第 2 節的 `--dry-run`。預期顯示 `Would create 0 skill links`。來源較新時，即使已安裝版本運作正常，套件內容差異仍會被列為衝突。
+上述檢查確認 58 個相對連結指向專案內的 `SKILL.md`，也確認指南入口與安裝器存在。若要進一步比對套件檔案，將 `PSTACK_SOURCE` 設為一份獨立、同版本且未修改的 pstack checkout，再執行第 2 節的 `--dry-run`。套件檔案一致且連結都已存在時，會顯示 `Would create 0 skill links`。若來源較新，內容差異仍會被列為衝突。
+
+手上只有安裝副本時，可用套件附帶的靜態檢查驗證技能格式、介面資料與文件中的本機參考連結。執行指令的 Python 環境需要 PyYAML，版本見 [開發相依清單](../requirements-dev.txt)。
+
+```bash
+python3 -B "$PSTACK_TARGET/.codex/pstack/scripts/validate.py"
+```
 
 ## 5. 在 Codex 選取技能
 
-- **桌面 App**開啟 `PSTACK_TARGET` 指定的專案根目錄，在該專案建立新聊天，再從技能選擇介面加入 `poteto-help` 或 `poteto-mode`。
+- **桌面 App**開啟 `PSTACK_TARGET` 指定的專案根目錄，建立 **Local** 聊天。若介面顯示 **Work in**，選擇 **This computer** 並關閉 **Worktree**。接著從技能選擇介面加入 `poteto-help` 或 `poteto-mode`。參考 [Codex 工作環境說明](https://learn.chatgpt.com/docs/environments/modes)。
 - **CLI**從目標專案啟動。進入 Codex 後，可使用 `/skills` 或輸入 `$` 選取技能。參考 [Codex 官方 Skills 文件](https://learn.chatgpt.com/docs/build-skills)。
 
 ```bash
@@ -143,11 +149,13 @@ $poteto-help 請介紹這個專案可用的 pstack skills，並說明我可以�
 $poteto-mode 請唯讀檢視這個專案，整理主要目錄、如何啟動，以及現有測試的執行方式。
 ```
 
-若要調整模型繼承或 worker 數，可另外執行 `$setup-pstack`。基本使用可以沿用預設值。若技能未出現在選單，先確認 Codex 開啟的是目標專案，接著開新聊天或重新啟動 Codex。同名技能出現兩份時，請選取專案範圍的那份。
+若要調整模型繼承或 worker 數，可另外執行 `$setup-pstack`。基本使用可以沿用預設值。若技能未出現在選單，先確認聊天的工作環境使用的是目標專案目錄，接著開新聊天或重新啟動 Codex。同名技能出現兩份時，請選取專案範圍的那份。
+
+若要在 **Worktree** 聊天使用，選擇已將 pstack 的 `.agents/skills/` 連結與 `.codex/pstack/` 一起提交的分支建立 Worktree，或在建立後依第 2 節安裝。安裝與驗證時，都將 `PSTACK_TARGET` 指向 Worktree 的實際路徑，再用第 4 節確認連結。參考 [Codex Worktree 說明](https://learn.chatgpt.com/docs/environments/git-worktrees)。
 
 ## 6. 從已有的安裝重用同一版本
 
-若手上已有安裝完整的 macOS 專案，可以直接使用其中的安裝器。安裝器會取用該專案的套件快照，並在新專案建立自己的相對連結。
+若手上已有在 macOS 完整安裝 pstack 的專案，可以直接使用其中的安裝器。安裝器會取用該專案的套件快照，並在新專案建立自己的相對連結。若需先確認範本的套件內容，可依第 4 節比對來源或執行靜態檢查。
 
 ```bash
 PSTACK_TEMPLATE="$HOME/Projects/SkillsTestProj"
@@ -168,7 +176,7 @@ python3 "$PSTACK_TEMPLATE/.codex/pstack/scripts/install-skills.py" --project "$P
 python3 "$PSTACK_TEMPLATE/.codex/pstack/scripts/install-skills.py" --project "$PSTACK_TARGET"
 ```
 
-如要檢查新專案的連結是否與自己的套件一致，可以使用它內附的安裝器執行預覽。預期顯示 `Would create 0 skill links`。
+可以用新專案內附的安裝器預覽。如果沒有衝突且顯示 `Would create 0 skill links`，表示**目前套件所列的技能連結都已存在**。例如缺少共用參考檔，但 `SKILL.md` 和連結仍在，預覽仍可能顯示 `0`。若要核對套件檔案，請依第 4 節使用獨立的同版本來源比對。
 
 ```bash
 python3 "$PSTACK_TARGET/.codex/pstack/scripts/install-skills.py" --project "$PSTACK_TARGET" --dry-run
